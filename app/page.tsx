@@ -177,7 +177,7 @@ export default function Home() {
               </button>
             </div>
             <div className="text-center mt-4">
-              <p className="text-white text-xl font-semibold drop-shadow-lg">You've got mail!</p>
+              <p className="text-white text-xl font-semibold drop-shadow-lg">You got mail!</p>
             </div>
           </div>
         ) : (
