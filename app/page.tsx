@@ -1,103 +1,218 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import Image from "next/image";
 
-export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+interface Letter {
+  id: number;
+  title: string;
+  imageUrl: string;
+}
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+export default function Home() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [password, setPassword] = useState("");
+  const [showInbox, setShowInbox] = useState(false);
+  const [selectedLetter, setSelectedLetter] = useState<Letter | null>(null);
+
+  // Sample letters array - you can replace these with your actual letter images
+  const letters: Letter[] = [
+    {
+      id: 1,
+      title: "Letter 1",
+      imageUrl: "/letter1.png" // You'll upload this PNG
+    },
+    {
+      id: 2,
+      title: "Letter 2", 
+      imageUrl: "/letter2.png" // You'll upload this PNG
+    },
+    // Add more letters as needed
+  ];
+
+  useEffect(() => {
+    // Check if user is already authenticated
+    const auth = localStorage.getItem("marta-auth");
+    if (auth === "true") {
+      setIsAuthenticated(true);
+    }
+  }, []);
+
+  const handlePasswordSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (password === "reidhjol1") {
+      setIsAuthenticated(true);
+      localStorage.setItem("marta-auth", "true");
+    } else {
+      alert("Wrong password!");
+      setPassword("");
+    }
+  };
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    setShowInbox(false);
+    setSelectedLetter(null);
+    localStorage.removeItem("marta-auth");
+  };
+
+  if (!isAuthenticated) {
+    return (
+      <div 
+        className="min-h-screen flex items-center justify-center bg-cover bg-center bg-no-repeat"
+        style={{
+          backgroundImage: "url('/images/misterlonely.jpg')", // You'll upload this image
+          backgroundSize: "cover",
+          backgroundPosition: "center"
+        }}
+      >
+        <div className="p-8 rounded-lg max-w-md w-full mx-4">
+          <h1 className="text-3xl font-bold text-center mb-6 text-white ">
+            Pósthólf Mörtu
+          </h1>
+          <form onSubmit={handlePasswordSubmit} className="space-y-4">
+            <div>
+              <label htmlFor="password" className="block text-sm font-medium text-white mb-2">
+                Enter Password
+              </label>
+              <input
+                type="password"
+                id="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-3 py-2 border border-white/30 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-white focus:border-white bg-white/10 text-white placeholder-white/70"
+                placeholder="Enter password"
+                required
+              />
+            </div>
+            <button
+              type="submit"
+              className="w-full bg-white/20 text-white py-2 px-4 rounded-md hover:bg-white/30 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 transition-colors border border-white/30"
+            >
+              Enter
+            </button>
+          </form>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      </div>
+    );
+  }
+
+  if (selectedLetter) {
+    return (
+      <div className="min-h-screen bg-gray-100 dark:bg-gray-900 p-4">
+        <div className="max-w-4xl mx-auto">
+          <div className="flex justify-between items-center mb-6">
+            <button
+              onClick={() => setSelectedLetter(null)}
+              className="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 transition-colors"
+            >
+              ← Back to Inbox
+            </button>
+            <button
+              onClick={handleLogout}
+              className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition-colors"
+            >
+              Logout
+            </button>
+          </div>
+          
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+            <h2 className="text-2xl font-bold mb-4 text-gray-800 dark:text-white">
+              {selectedLetter.title}
+            </h2>
+            <div className="flex justify-center">
+              <Image
+                src={selectedLetter.imageUrl}
+                alt={selectedLetter.title}
+                width={800}
+                height={600}
+                className="max-w-full h-auto rounded-lg shadow-md"
+                onError={(e) => {
+                  console.error("Image failed to load:", selectedLetter.imageUrl);
+                  e.currentTarget.style.display = "none";
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div 
+      className="min-h-screen bg-cover bg-center bg-no-repeat p-4"
+      style={{
+        backgroundImage: "url('/images/postbox.png')", // You'll upload this image
+        backgroundSize: "cover",
+        backgroundPosition: "center"
+      }}
+    >
+      <div className="max-w-4xl mx-auto">
+        <div className="flex justify-between items-center mb-32">
+          <button
+            onClick={handleLogout}
+            className="text-red-600 px-2 py-2 rounded-md hover:text-red-700 transition-colors"
+          >
+            Logout
+          </button>
+        </div>
+
+        {!showInbox ? (
+          <div>
+            <div className="flex justify-center">
+              <button
+                onClick={() => setShowInbox(true)}
+                className="relative text-white rounded-full shadow-lg transition-all transform hover:scale-105"
+              >
+                <Image
+                  src="/images/pngegg.png" // You'll upload this image
+                  alt="Mail"
+                  width={200}
+                  height={200}
+                />
+                <div className="absolute top-10 -right-1 bg-red-500 text-white text-xs rounded-full w-10 h-10 flex items-center justify-center animate-pulse">
+                  {letters.length}
+                </div>
+              </button>
+            </div>
+            <div className="text-center mt-4">
+              <p className="text-white text-xl font-semibold drop-shadow-lg">You've got mail!</p>
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-lg shadow-xl p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-white drop-shadow-lg">
+                pósthólf
+              </h2>
+              <button
+                onClick={() => setShowInbox(false)}
+                className=" text-white px-4 py-2 rounded-md hover:text-red-600 transition-colors"
+              >
+                ← Back
+              </button>
+            </div>
+            
+            <div className="space-y-3">
+              {letters.map((letter) => (
+                <div
+                  key={letter.id}
+                  onClick={() => setSelectedLetter(letter)}
+                  className="p-4 border border-white/30 rounded-lg hover:bg-white/10 cursor-pointer transition-colors bg-white/5"
+                >
+                  <h3 className="text-lg font-medium text-white drop-shadow-lg">
+                    {letter.title}
+                  </h3>
+                  <p className="text-sm text-white/80 drop-shadow-lg">
+                    lesa bréf
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
