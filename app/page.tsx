@@ -19,13 +19,13 @@ export default function Home() {
   const letters: Letter[] = [
     {
       id: 1,
-      title: "Letter 1",
-      imageUrl: "/letter1.png" // You'll upload this PNG
+      title: "Fyrsta bréf",
+      imageUrl: "/images/rename.png" // You'll upload this PNG
     },
     {
       id: 2,
-      title: "Letter 2", 
-      imageUrl: "/letter2.png" // You'll upload this PNG
+      title: "Skemmtileg mynd",
+      imageUrl: "/images/skor.jpeg" // You'll upload this PNG
     },
     // Add more letters as needed
   ];
@@ -99,24 +99,25 @@ export default function Home() {
 
   if (selectedLetter) {
     return (
-      <div className="min-h-screen bg-gray-100 dark:bg-gray-900 p-4">
+      <div 
+        className="min-h-screen bg-cover bg-center bg-no-repeat p-4"
+        style={{
+          backgroundImage: "url('/images/misterlonely.jpg')", // You'll upload this image
+          backgroundSize: "cover",
+          backgroundPosition: "center"
+        }}
+      >
         <div className="max-w-4xl mx-auto">
           <div className="flex justify-between items-center mb-6">
             <button
               onClick={() => setSelectedLetter(null)}
-              className="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 transition-colors"
+              className=" text-white px-4 py-2 rounded-md transition-colors"
             >
-              ← Back to Inbox
-            </button>
-            <button
-              onClick={handleLogout}
-              className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition-colors"
-            >
-              Logout
+              ← Aftur í pósthólf
             </button>
           </div>
           
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+          <div className="">
             <h2 className="text-2xl font-bold mb-4 text-gray-800 dark:text-white">
               {selectedLetter.title}
             </h2>
@@ -124,8 +125,8 @@ export default function Home() {
               <Image
                 src={selectedLetter.imageUrl}
                 alt={selectedLetter.title}
-                width={800}
-                height={600}
+                width={600}
+                height={300}
                 className="max-w-full h-auto rounded-lg shadow-md"
                 onError={(e) => {
                   console.error("Image failed to load:", selectedLetter.imageUrl);
