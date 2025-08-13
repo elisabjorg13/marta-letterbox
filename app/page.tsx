@@ -18,6 +18,11 @@ export default function Home() {
   // Sample letters array - you can replace these with your actual letter images
   const letters: Letter[] = [
     {
+      id: 3,
+      title: "13. ágúst",
+      imageUrl: "/images/today.png" // You'll upload this PNG
+    },
+    {
       id: 1,
       title: "Fyrsta bréf",
       imageUrl: "/images/rename.png" // You'll upload this PNG
@@ -27,6 +32,7 @@ export default function Home() {
       title: "Skemmtileg mynd",
       imageUrl: "/images/skor.jpeg" // You'll upload this PNG
     },
+
     // Add more letters as needed
   ];
 
@@ -206,7 +212,7 @@ export default function Home() {
                     {letter.title}
                   </h3>
                   <p className="text-sm text-white/80 drop-shadow-lg">
-                    lesa bréf
+                    opna 
                   </p>
                 </div>
               ))}

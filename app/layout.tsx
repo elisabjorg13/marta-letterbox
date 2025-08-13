@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Pósthólf",
-  description: "A personal letterbox for reading letters and messages",
+  description: "skemmtilegt og gott pósthólf",
 };
 
 export default function RootLayout({
