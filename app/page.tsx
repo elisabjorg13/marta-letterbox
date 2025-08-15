@@ -6,7 +6,8 @@ import Image from "next/image";
 interface Letter {
   id: number;
   title: string;
-  imageUrl: string;
+  imageUrl?: string;
+  videoUrl?: string;
 }
 
 export default function Home() {
@@ -17,6 +18,11 @@ export default function Home() {
 
   // Sample letters array - you can replace these with your actual letter images
   const letters: Letter[] = [
+    {
+      id: 4,
+      title: "Myndband dagsins",
+      videoUrl: "https://www.youtube.com/embed/4YM2kwxFG8Y" // Replace with your actual video URL
+    },
     {
       id: 3,
       title: "13. ágúst",
@@ -128,17 +134,30 @@ export default function Home() {
               {selectedLetter.title}
             </h2>
             <div className="flex justify-center">
-              <Image
-                src={selectedLetter.imageUrl}
-                alt={selectedLetter.title}
-                width={600}
-                height={300}
-                className="max-w-full h-auto rounded-lg shadow-md"
-                onError={(e) => {
-                  console.error("Image failed to load:", selectedLetter.imageUrl);
-                  e.currentTarget.style.display = "none";
-                }}
-              />
+              {selectedLetter.videoUrl ? (
+                <div className="max-w-full">
+                  <iframe
+                    src={selectedLetter.videoUrl}
+                    title={selectedLetter.title}
+                    width="600"
+                    height="400"
+                    className="rounded-lg shadow-md"
+                    allowFullScreen
+                  />
+                </div>
+              ) : selectedLetter.imageUrl ? (
+                <Image
+                  src={selectedLetter.imageUrl}
+                  alt={selectedLetter.title}
+                  width={600}
+                  height={300}
+                  className="max-w-full h-auto rounded-lg shadow-md"
+                  onError={(e) => {
+                    console.error("Image failed to load:", selectedLetter.imageUrl);
+                    e.currentTarget.style.display = "none";
+                  }}
+                />
+              ) : null}
             </div>
           </div>
         </div>
