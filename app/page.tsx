@@ -19,6 +19,11 @@ export default function Home() {
   // Sample letters array - you can replace these with your actual letter images
   const letters: Letter[] = [
     {
+      id: 5,
+      title: "18. ágúst",
+      imageUrl: "/images/bref3.png" // You'll upload this PNG
+    },
+    {
       id: 4,
       title: "Myndband dagsins",
       videoUrl: "https://www.youtube.com/embed/4YM2kwxFG8Y" // Replace with your actual video URL
