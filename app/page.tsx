@@ -67,7 +67,10 @@ export default function Home() {
       const parsedReplies = JSON.parse(savedReplies);
       const updatedLetters = letters.map(letter => ({
         ...letter,
-        replies: parsedReplies[letter.id] || []
+        replies: (parsedReplies[letter.id] || []).map((reply: any) => ({
+          ...reply,
+          timestamp: new Date(reply.timestamp)
+        }))
       }));
       setLetters(updatedLetters);
     }
