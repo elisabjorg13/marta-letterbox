@@ -67,31 +67,59 @@ export default function Home() {
     // Add more letters as needed
   ]);
 
-  // Function to load shared replies from localStorage
-  const loadSharedReplies = useCallback(() => {
-    const savedReplies = localStorage.getItem("marta-shared-replies");
-    if (savedReplies) {
-      const parsedReplies = JSON.parse(savedReplies);
-      setLetters(prevLetters => 
-        prevLetters.map(letter => ({
-          ...letter,
-          replies: (parsedReplies[letter.id] || []).map((reply: StoredReply) => ({
-            ...reply,
-            timestamp: new Date(reply.timestamp)
-          }))
-        }))
-      );
-    }
-  }, []);
+  // JSONBin.io configuration for shared storage
+  const JSONBIN_API_KEY = "$2a$10$HliQVCH.IEWx9XkiRH8hPumYRMjJxOrrPKqikEpBRNICljyEHQyii";
+  const JSONBIN_BIN_ID = "68a470ead0ea881f405d6177";
+  const JSONBIN_URL = `https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}`;
 
-  // Function to save shared replies to localStorage
-  const saveSharedReplies = useCallback((updatedLetters: Letter[]) => {
-    const repliesToSave: { [key: number]: Reply[] } = {};
-    updatedLetters.forEach(letter => {
-      repliesToSave[letter.id] = letter.replies;
-    });
-    localStorage.setItem("marta-shared-replies", JSON.stringify(repliesToSave));
-  }, []);
+  // Function to load shared replies from JSONBin.io
+  const loadSharedReplies = useCallback(async () => {
+    try {
+      const response = await fetch(JSONBIN_URL, {
+        headers: {
+          'X-Master-Key': JSONBIN_API_KEY,
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        const savedReplies = data.record?.replies || {};
+        
+        setLetters(prevLetters => 
+          prevLetters.map(letter => ({
+            ...letter,
+            replies: (savedReplies[letter.id] || []).map((reply: StoredReply) => ({
+              ...reply,
+              timestamp: new Date(reply.timestamp)
+            }))
+          }))
+        );
+      }
+    } catch (error) {
+      console.log('Could not load replies:', error);
+    }
+  }, [JSONBIN_URL, JSONBIN_API_KEY]);
+
+  // Function to save shared replies to JSONBin.io
+  const saveSharedReplies = useCallback(async (updatedLetters: Letter[]) => {
+    try {
+      const repliesToSave: { [key: number]: Reply[] } = {};
+      updatedLetters.forEach(letter => {
+        repliesToSave[letter.id] = letter.replies;
+      });
+
+      await fetch(JSONBIN_URL, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Master-Key': JSONBIN_API_KEY,
+        },
+        body: JSON.stringify({ replies: repliesToSave })
+      });
+    } catch (error) {
+      console.log('Could not save replies:', error);
+    }
+  }, [JSONBIN_URL, JSONBIN_API_KEY]);
 
   useEffect(() => {
     // Check if user is already authenticated
@@ -131,7 +159,7 @@ export default function Home() {
     localStorage.removeItem("marta-auth");
   };
 
-  const handleReply = () => {
+  const handleReply = async () => {
     if (!selectedLetter || !replyText.trim() || !replyAuthor.trim()) return;
     
     const newReply: Reply = {
@@ -325,18 +353,12 @@ export default function Home() {
             >
               Logout
             </button>
-            {/* <button
+            <button
               onClick={loadSharedReplies}
               className="text-blue-600 px-2 py-2 rounded-md hover:text-blue-700 transition-colors"
             >
               🔄 Uppfæra
             </button>
-            <button
-              onClick={clearAllReplies}
-              className="text-yellow-600 px-2 py-2 rounded-md hover:text-yellow-700 transition-colors"
-            >
-              Hreinsa svör
-            </button> */}
           </div>
         </div>
 
@@ -379,9 +401,9 @@ export default function Home() {
             {/* Instructions for shared chat */}
             {/* <div className="bg-blue-500/20 border border-blue-400/30 rounded-lg p-3 mb-4">
               <p className="text-blue-200 text-sm">
-                💬 <strong>Shared Chat:</strong> Both you and Marta can see and reply to letters. 
+                💬 <strong>Real Shared Chat:</strong> Both you and Marta can see and reply to letters. 
                 Replies sync automatically every 5 seconds, or click "🔄 Uppfæra" to refresh manually.
-              </p>
+              </p> 
             </div> */}
 
             <div className="space-y-3">
