@@ -8,6 +8,7 @@ interface Letter {
   title: string;
   imageUrl?: string;
   videoUrl?: string;
+  textContent?: string;
   replies: Reply[];
 }
 
@@ -32,6 +33,9 @@ export default function Home() {
   const [selectedLetter, setSelectedLetter] = useState<Letter | null>(null);
   const [replyText, setReplyText] = useState("");
   const [replyAuthor, setReplyAuthor] = useState("");
+  const [showAddLetter, setShowAddLetter] = useState(false);
+  const [newLetterTitle, setNewLetterTitle] = useState("");
+  const [newLetterContent, setNewLetterContent] = useState("");
   const [letters, setLetters] = useState<Letter[]>([
     {
       id: 5,
@@ -83,17 +87,29 @@ export default function Home() {
       
       if (response.ok) {
         const data = await response.json();
-        const savedReplies = data.record?.replies || {};
         
-        setLetters(prevLetters => 
-          prevLetters.map(letter => ({
+        // Load letters from shared storage if available
+        if (data.record?.letters) {
+          setLetters(data.record.letters.map((letter: any) => ({
             ...letter,
-            replies: (savedReplies[letter.id] || []).map((reply: StoredReply) => ({
+            replies: letter.replies.map((reply: StoredReply) => ({
               ...reply,
               timestamp: new Date(reply.timestamp)
             }))
-          }))
-        );
+          })));
+        } else {
+          // Fallback to loading just replies for existing letters
+          const savedReplies = data.record?.replies || {};
+          setLetters(prevLetters => 
+            prevLetters.map(letter => ({
+              ...letter,
+              replies: (savedReplies[letter.id] || []).map((reply: StoredReply) => ({
+                ...reply,
+                timestamp: new Date(reply.timestamp)
+              }))
+            }))
+          );
+        }
       }
     } catch (error) {
       console.log('Could not load replies:', error);
@@ -188,6 +204,40 @@ export default function Home() {
     setReplyAuthor("");
   };
 
+  const handleAddLetter = async () => {
+    if (!newLetterTitle.trim() || !newLetterContent.trim()) return;
+    
+    const newLetter: Letter = {
+      id: Date.now(),
+      title: newLetterTitle.trim(),
+      textContent: newLetterContent.trim(),
+      replies: []
+    };
+    
+    // Add new letter to the beginning of the array
+    const updatedLetters = [newLetter, ...letters];
+    setLetters(updatedLetters);
+    
+    // Save to shared system - save the entire letters array, not just replies
+    try {
+      await fetch(JSONBIN_URL, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Master-Key': JSONBIN_API_KEY,
+        },
+        body: JSON.stringify({ letters: updatedLetters })
+      });
+    } catch (error) {
+      console.log('Could not save new letter:', error);
+    }
+    
+    // Clear the form and close modal
+    setNewLetterTitle("");
+    setNewLetterContent("");
+    setShowAddLetter(false);
+  };
+
   if (!isAuthenticated) {
     return (
       <div 
@@ -224,6 +274,93 @@ export default function Home() {
               Enter
             </button>
           </form>
+        </div>
+      </div>
+    );
+  }
+
+  // Add Letter Modal - check this first
+  if (showAddLetter) {
+    return (
+      <div 
+        className="min-h-screen bg-cover bg-center bg-no-repeat p-4"
+        style={{
+          backgroundImage: "url('/images/misterlonely.jpg')",
+          backgroundSize: "cover",
+          backgroundPosition: "center"
+        }}
+      >
+        <div className="max-w-2xl mx-auto">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-bold text-white font-serif">bréfaskrif </h2>
+            <button
+              onClick={() => setShowAddLetter(false)}
+              className="text-white px-4 py-2 rounded-md hover:text-red-600 transition-colors"
+            >
+              ← Aftur
+            </button>
+          </div>
+          
+          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-6 border border-white/20">
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-white mb-2">
+                  Skrifa bréf
+                </label>
+                <div className="relative">
+                  {/* Single paper background for both title and content */}
+                  <div className="relative bg-white border-2 border-gray-300 shadow-lg overflow-hidden">
+                    {/* Title and content on the same paper */}
+                    <div className="relative z-10 p-6">
+                      {/* Title input */}
+                      <div className="mb-6">
+                        <input
+                          type="text"
+                          value={newLetterTitle}
+                          onChange={(e) => setNewLetterTitle(e.target.value)}
+                          placeholder="Titill bréfs..."
+                          className="w-full px-3 py-2 border-0 bg-transparent placeholder-blue-500/70 focus:outline-none font-serif text-base font-bold"
+                          style={{ fontFamily: 'Georgia, serif', color: '#0000FF' }}
+                        />
+                      </div>
+                      
+                      {/* Content textarea with scrollable overflow */}
+                      <div className="max-h-[32rem] overflow-y-auto">
+                        <textarea
+                          value={newLetterContent}
+                          onChange={(e) => setNewLetterContent(e.target.value)}
+                          placeholder="Skrifaðu bréfið þitt hér..."
+                          rows={20}
+                          className="w-full px-3 py-3 border-0 bg-transparent placeholder-blue-500/70 focus:outline-none resize-none font-serif text-sm leading-tight"
+                          style={{ fontFamily: 'Georgia, serif', color: '#0000FF' }}
+                        />
+                      </div>
+                    </div>
+                    
+                    {/* Red paper lines for the entire paper */}
+                    <div className="absolute inset-0 pointer-events-none">
+                      {[...Array(100)].map((_, i) => (
+                        <div 
+                          key={i}
+                          className="absolute left-0 right-0 h-px bg-red-400 opacity-60"
+                          style={{ top: `${(i + 1) * 20}px` }}
+                        ></div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+        
+              </div>
+              
+              <button
+                onClick={handleAddLetter}
+                disabled={!newLetterTitle.trim() || !newLetterContent.trim()}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors border border-blue-500 shadow-lg"
+              >
+                Senda bréf
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -277,6 +414,58 @@ export default function Home() {
                     e.currentTarget.style.display = "none";
                   }}
                 />
+              ) : selectedLetter.textContent ? (
+                <div className="max-w-4xl mx-auto">
+                  <div className="relative bg-white border-2 border-gray-300 shadow-lg transform rotate-1 hover:rotate-0 transition-transform duration-300 overflow-hidden">
+                    {/* Letter content */}
+                    <div className="relative z-10 p-8">
+                      {/* Title line */}
+                      <div className="mb-4">
+                        <h3 className="text-base font-serif font-bold" style={{ fontFamily: 'Georgia, serif', color: '#0000FF' }}>
+                          {selectedLetter.title}
+                        </h3>
+                      </div>
+                      
+                      {/* Date line */}
+                      <div className="text-right mb-4">
+                        <span className="text-xs font-serif italic" style={{ color: '#0000FF' }}>
+                          {new Date().toLocaleDateString('fr-FR', { 
+                            day: 'numeric', 
+                            month: 'long', 
+                            year: 'numeric' 
+                          })}
+                        </span>
+                      </div>
+                      
+                      {/* Letter text with scrollable content */}
+                      <div className="font-serif leading-tight max-h-[32rem] overflow-y-auto">
+                        <p className="text-sm whitespace-pre-wrap" style={{ fontFamily: 'Georgia, serif', color: '#0000FF' }}>
+                          {selectedLetter.textContent}
+                        </p>
+                      </div>
+                      
+                      {/* Signature line */}
+                      <div className="mt-6 pt-3 border-t border-red-400">
+                        <div className="text-right">
+                          <span className="text-xs font-serif italic" style={{ color: '#0000FF' }}>
+                            Avec amour,
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Red paper lines - many more to cover the longer paper */}
+                    <div className="absolute inset-0 pointer-events-none">
+                      {[...Array(100)].map((_, i) => (
+                        <div 
+                          key={i}
+                          className="absolute left-0 right-0 h-px bg-red-400 opacity-60"
+                          style={{ top: `${(i + 1) * 20}px` }}
+                        ></div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
               ) : null}
             </div>
 
@@ -290,7 +479,7 @@ export default function Home() {
               <div className="space-y-4 mb-6">
                 {selectedLetter.replies.map((reply) => (
                   <div key={reply.id} className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
-                    <div className="flex justify-between items-start mb-2">
+                    <div className="flex justify-between items-center mb-2">
                       <span className="font-medium text-white">{reply.author}</span>
                       <span className="text-sm text-white/70">
                         {reply.timestamp.toLocaleDateString('is-IS')} {reply.timestamp.toLocaleTimeString('is-IS', {hour: '2-digit', minute:'2-digit'})}
@@ -364,6 +553,19 @@ export default function Home() {
 
         {!showInbox ? (
           <div>
+            {/* Add Letter Button */}
+            <div className="flex justify-center mb-8">
+              <button
+                onClick={() => setShowAddLetter(true)}
+                className="bg-white/20 hover:bg-white/30 text-white rounded-full w-24 h-24 flex items-center justify-center transition-all transform hover:scale-105 border-2 border-white/30 shadow-lg"
+              >
+                <span className="text-4xl font-bold">+</span>
+              </button>
+            </div>
+            <div className="text-center mb-8">
+              <p className="text-white text-lg font-semibold drop-shadow-lg">Skrifa bréf</p>
+            </div>
+
             <div className="flex justify-center">
               <button
                 onClick={() => setShowInbox(true)}
@@ -403,7 +605,7 @@ export default function Home() {
               <p className="text-blue-200 text-sm">
                 💬 <strong>Real Shared Chat:</strong> Both you and Marta can see and reply to letters. 
                 Replies sync automatically every 5 seconds, or click "🔄 Uppfæra" to refresh manually.
-              </p> 
+              </p>
             </div> */}
 
             <div className="space-y-3">
@@ -436,4 +638,5 @@ export default function Home() {
       </div>
     </div>
   );
+
 }
