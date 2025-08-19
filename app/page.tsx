@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 
 interface Letter {
@@ -15,6 +15,13 @@ interface Reply {
   id: string;
   text: string;
   timestamp: Date;
+  author: string;
+}
+
+interface StoredReply {
+  id: string;
+  text: string;
+  timestamp: string;
   author: string;
 }
 
@@ -61,29 +68,30 @@ export default function Home() {
   ]);
 
   // Function to load shared replies from localStorage
-  const loadSharedReplies = () => {
+  const loadSharedReplies = useCallback(() => {
     const savedReplies = localStorage.getItem("marta-shared-replies");
     if (savedReplies) {
       const parsedReplies = JSON.parse(savedReplies);
-      const updatedLetters = letters.map(letter => ({
-        ...letter,
-        replies: (parsedReplies[letter.id] || []).map((reply: any) => ({
-          ...reply,
-          timestamp: new Date(reply.timestamp)
+      setLetters(prevLetters => 
+        prevLetters.map(letter => ({
+          ...letter,
+          replies: (parsedReplies[letter.id] || []).map((reply: StoredReply) => ({
+            ...reply,
+            timestamp: new Date(reply.timestamp)
+          }))
         }))
-      }));
-      setLetters(updatedLetters);
+      );
     }
-  };
+  }, []);
 
   // Function to save shared replies to localStorage
-  const saveSharedReplies = (updatedLetters: Letter[]) => {
+  const saveSharedReplies = useCallback((updatedLetters: Letter[]) => {
     const repliesToSave: { [key: number]: Reply[] } = {};
     updatedLetters.forEach(letter => {
       repliesToSave[letter.id] = letter.replies;
     });
     localStorage.setItem("marta-shared-replies", JSON.stringify(repliesToSave));
-  };
+  }, []);
 
   useEffect(() => {
     // Check if user is already authenticated
@@ -103,7 +111,7 @@ export default function Home() {
     }, 5000);
     
     return () => clearInterval(interval);
-  }, [isAuthenticated]);
+  }, [isAuthenticated, loadSharedReplies]);
 
   const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -123,15 +131,6 @@ export default function Home() {
     localStorage.removeItem("marta-auth");
   };
 
-  const clearAllReplies = () => {
-    if (confirm("Ertu viss um að þú viljir eyða öllum svörum?")) {
-      const clearedLetters = letters.map(letter => ({ ...letter, replies: [] }));
-      setLetters(clearedLetters);
-      saveSharedReplies(clearedLetters);
-      setSelectedLetter(null);
-    }
-  };
-
   const handleReply = () => {
     if (!selectedLetter || !replyText.trim() || !replyAuthor.trim()) return;
     
@@ -147,13 +146,14 @@ export default function Home() {
     setSelectedLetter(updatedLetter);
     
     // Update the letters array
-    const updatedLetters = letters.map(letter => 
-      letter.id === selectedLetter.id ? updatedLetter : letter
-    );
-    setLetters(updatedLetters);
-    
-    // Save to shared system
-    saveSharedReplies(updatedLetters);
+    setLetters(prevLetters => {
+      const updatedLetters = prevLetters.map(letter => 
+        letter.id === selectedLetter.id ? updatedLetter : letter
+      );
+      // Save to shared system
+      saveSharedReplies(updatedLetters);
+      return updatedLetters;
+    });
     
     // Clear the reply form
     setReplyText("");
