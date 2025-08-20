@@ -26,6 +26,15 @@ interface StoredReply {
   author: string;
 }
 
+interface StoredLetter {
+  id: number;
+  title: string;
+  imageUrl?: string;
+  videoUrl?: string;
+  textContent?: string;
+  replies: StoredReply[];
+}
+
 export default function Home() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState("");
@@ -90,7 +99,7 @@ export default function Home() {
         
         // Load letters from shared storage if available
         if (data.record?.letters) {
-          setLetters(data.record.letters.map((letter: any) => ({
+          setLetters(data.record.letters.map((letter: StoredLetter) => ({
             ...letter,
             replies: letter.replies.map((reply: StoredReply) => ({
               ...reply,
