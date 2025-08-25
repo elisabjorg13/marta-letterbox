@@ -255,11 +255,29 @@ export default function Home() {
     
     // Convert regular YouTube URL to embed URL if needed
     let embedUrl = newVideoUrl.trim();
+    
+    // Handle different YouTube URL formats
     if (embedUrl.includes('youtube.com/watch')) {
       const videoId = embedUrl.split('v=')[1]?.split('&')[0];
       if (videoId) {
         embedUrl = `https://www.youtube.com/embed/${videoId}`;
       }
+    } else if (embedUrl.includes('youtu.be/')) {
+      const videoId = embedUrl.split('youtu.be/')[1]?.split('?')[0];
+      if (videoId) {
+        embedUrl = `https://www.youtube.com/embed/${videoId}`;
+      }
+    } else if (embedUrl.includes('youtube.com/embed/')) {
+      // Already in embed format, keep as is
+    } else {
+      alert('Please enter a valid YouTube URL');
+      return;
+    }
+    
+    // Validate the video ID
+    if (!embedUrl.includes('/embed/')) {
+      alert('Could not extract video ID from URL. Please check your YouTube URL.');
+      return;
     }
     
     const newVideo: Letter = {
@@ -470,7 +488,9 @@ export default function Home() {
                   className="w-full px-3 py-2 border border-white/30 rounded-md bg-white/20 text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-white"
                 />
                 <p className="text-xs text-white/70 mt-1">
-                  You can paste a regular YouTube URL, it will be converted to embed format automatically
+                  You can paste a regular YouTube URL, it will be converted to embed format automatically.
+                  <br />
+                  <strong>Supported formats:</strong> youtube.com/watch?v=..., youtu.be/..., or embed URLs
                 </p>
               </div>
               
@@ -522,7 +542,17 @@ export default function Home() {
                     height="400"
                     className="rounded-lg shadow-md"
                     allowFullScreen
+                    frameBorder="0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    onError={(e) => {
+                      console.error("Video failed to load:", selectedLetter.videoUrl);
+                    }}
                   />
+                  <div className="mt-2 text-center">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      If the video doesn't load, try refreshing the page or check your internet connection.
+                    </p>
+                  </div>
                 </div>
               ) : selectedLetter.imageUrl ? (
                 <Image
