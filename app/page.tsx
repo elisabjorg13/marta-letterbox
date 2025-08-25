@@ -550,7 +550,7 @@ export default function Home() {
                   />
                   <div className="mt-2 text-center">
                     <p className="text-sm text-gray-600 dark:text-gray-400">
-                      If the video doesn't load, try refreshing the page or check your internet connection.
+                      If the video doesnt load, try refreshing the page or check your internet connection.
                     </p>
                   </div>
                 </div>
