@@ -43,8 +43,11 @@ export default function Home() {
   const [replyText, setReplyText] = useState("");
   const [replyAuthor, setReplyAuthor] = useState("");
   const [showAddLetter, setShowAddLetter] = useState(false);
+  const [showAddVideo, setShowAddVideo] = useState(false);
   const [newLetterTitle, setNewLetterTitle] = useState("");
   const [newLetterContent, setNewLetterContent] = useState("");
+  const [newVideoTitle, setNewVideoTitle] = useState("");
+  const [newVideoUrl, setNewVideoUrl] = useState("");
   const [letters, setLetters] = useState<Letter[]>([
     {
       id: 5,
@@ -247,6 +250,49 @@ export default function Home() {
     setShowAddLetter(false);
   };
 
+  const handleAddVideo = async () => {
+    if (!newVideoTitle.trim() || !newVideoUrl.trim()) return;
+    
+    // Convert regular YouTube URL to embed URL if needed
+    let embedUrl = newVideoUrl.trim();
+    if (embedUrl.includes('youtube.com/watch')) {
+      const videoId = embedUrl.split('v=')[1]?.split('&')[0];
+      if (videoId) {
+        embedUrl = `https://www.youtube.com/embed/${videoId}`;
+      }
+    }
+    
+    const newVideo: Letter = {
+      id: Date.now(),
+      title: newVideoTitle.trim(),
+      videoUrl: embedUrl,
+      replies: []
+    };
+    
+    // Add the new video to the beginning of the array
+    const updatedLetters = [newVideo, ...letters];
+    setLetters(updatedLetters);
+    
+    // Save to JSONBin.io
+    try {
+      await fetch(JSONBIN_URL, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Master-Key': JSONBIN_API_KEY,
+        },
+        body: JSON.stringify({ letters: updatedLetters })
+      });
+    } catch (error) {
+      console.log('Could not save new video:', error);
+    }
+    
+    // Clear form and close modal
+    setNewVideoTitle("");
+    setNewVideoUrl("");
+    setShowAddVideo(false);
+  };
+
   if (!isAuthenticated) {
     return (
       <div 
@@ -367,6 +413,73 @@ export default function Home() {
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors border border-blue-500 shadow-lg"
               >
                 Senda bréf
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Add Video Modal
+  if (showAddVideo) {
+    return (
+      <div 
+        className="min-h-screen bg-cover bg-center bg-no-repeat p-4"
+        style={{
+          backgroundImage: "url('/images/misterlonely.jpg')",
+          backgroundSize: "cover",
+          backgroundPosition: "center"
+        }}
+      >
+        <div className="max-w-2xl mx-auto">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-bold text-white font-serif">myndband</h2>
+            <button
+              onClick={() => setShowAddVideo(false)}
+              className="text-white px-4 py-2 rounded-md hover:text-red-600 transition-colors"
+            >
+              ← Aftur
+            </button>
+          </div>
+          
+          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-6 border border-white/20">
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-white mb-2">
+                  Bæta við myndbandi
+                </label>
+                <input
+                  type="text"
+                  value={newVideoTitle}
+                  onChange={(e) => setNewVideoTitle(e.target.value)}
+                  placeholder="Titill myndbands..."
+                  className="w-full px-3 py-2 border border-white/30 rounded-md bg-white/20 text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-white"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-white mb-2">
+                  YouTube URL
+                </label>
+                <input
+                  type="url"
+                  value={newVideoUrl}
+                  onChange={(e) => setNewVideoUrl(e.target.value)}
+                  placeholder="https://www.youtube.com/watch?v=..."
+                  className="w-full px-3 py-2 border border-white/30 rounded-md bg-white/20 text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-white"
+                />
+                <p className="text-xs text-white/70 mt-1">
+                  You can paste a regular YouTube URL, it will be converted to embed format automatically
+                </p>
+              </div>
+              
+              <button
+                onClick={handleAddVideo}
+                disabled={!newVideoTitle.trim() || !newVideoUrl.trim()}
+                className="w-full bg-red-600 hover:bg-red-700 text-white py-3 px-4 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors border border-red-500 shadow-lg"
+              >
+                Bæta við myndbandi
               </button>
             </div>
           </div>
@@ -562,17 +675,27 @@ export default function Home() {
 
         {!showInbox ? (
           <div>
-            {/* Add Letter Button */}
-            <div className="flex justify-center mb-8">
-              <button
-                onClick={() => setShowAddLetter(true)}
-                className="bg-white/20 hover:bg-white/30 text-white rounded-full w-24 h-24 flex items-center justify-center transition-all transform hover:scale-105 border-2 border-white/30 shadow-lg"
-              >
-                <span className="text-4xl font-bold">+</span>
-              </button>
-            </div>
-            <div className="text-center mb-8">
-              <p className="text-white text-lg font-semibold drop-shadow-lg">Skrifa bréf</p>
+            {/* Add Letter and Video Buttons */}
+            <div className="flex justify-center space-x-8 mb-8">
+              <div className="text-center">
+                <button
+                  onClick={() => setShowAddLetter(true)}
+                  className="bg-white/20 hover:bg-white/30 text-white rounded-full w-24 h-24 flex items-center justify-center transition-all transform hover:scale-105 border-2 border-white/30 shadow-lg"
+                >
+                  <span className="text-4xl font-bold">+</span>
+                </button>
+                <p className="text-white text-lg font-semibold drop-shadow-lg mt-2">Skrifa bréf</p>
+              </div>
+              
+              <div className="text-center">
+                <button
+                  onClick={() => setShowAddVideo(true)}
+                  className="bg-red-500/20 hover:bg-red-500/30 text-white rounded-full w-24 h-24 flex items-center justify-center transition-all transform hover:scale-105 border-2 border-red-500/30 shadow-lg"
+                >
+                  <span className="text-4xl font-bold">▶</span>
+                </button>
+                <p className="text-white text-lg font-semibold drop-shadow-lg mt-2">Bæta myndbandi</p>
+              </div>
             </div>
 
             <div className="flex justify-center">
