@@ -35,6 +35,17 @@ interface StoredLetter {
   replies: StoredReply[];
 }
 
+interface LetterVersion {
+  timestamp: string;
+  letters: StoredLetter[];
+}
+
+interface StoredData {
+  letters: StoredLetter[];
+  versions: LetterVersion[];
+  lastUpdated: string;
+}
+
 export default function Home() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState("");
@@ -88,7 +99,7 @@ export default function Home() {
   const JSONBIN_BIN_ID = "68a470ead0ea881f405d6177";
   const JSONBIN_URL = `https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}`;
 
-  // Function to load shared replies from JSONBin.io
+  // Function to load shared letters from JSONBin.io
   const loadSharedReplies = useCallback(async () => {
     try {
       const response = await fetch(JSONBIN_URL, {
@@ -99,9 +110,11 @@ export default function Home() {
       
       if (response.ok) {
         const data = await response.json();
+        console.log('JSONBin.io data:', data.record);
         
         // Load letters from shared storage if available
-        if (data.record?.letters) {
+        if (data.record?.letters && data.record.letters.length > 0) {
+          console.log('Loading letters from JSONBin.io:', data.record.letters);
           setLetters(data.record.letters.map((letter: StoredLetter) => ({
             ...letter,
             replies: letter.replies.map((reply: StoredReply) => ({
@@ -109,9 +122,54 @@ export default function Home() {
               timestamp: new Date(reply.timestamp)
             }))
           })));
-        } else {
-          // Fallback to loading just replies for existing letters
-          const savedReplies = data.record?.replies || {};
+        } else if (data.record?.replies) {
+          // Handle old format where only replies were stored
+          console.log('Loading from old format (replies only)');
+          const savedReplies = data.record.replies;
+          
+          // Find missing letters that have replies but aren't in our default list
+          const existingLetterIds = new Set(letters.map(l => l.id));
+          const missingLetterIds = Object.keys(savedReplies).filter(id => !existingLetterIds.has(parseInt(id)));
+          
+          if (missingLetterIds.length > 0) {
+            console.log('Found missing letters with replies:', missingLetterIds);
+            
+            // Try to recreate missing letters based on reply content
+            const recoveredLetters: Letter[] = missingLetterIds.map(id => {
+              const replies = savedReplies[parseInt(id)];
+              const firstReply = replies[0];
+              
+              // Try to guess the letter type and content from replies
+              let title = `Recovered Letter ${id}`;
+              let content = '';
+              
+              if (firstReply.text.includes('video') || firstReply.text.includes('syningu')) {
+                title = 'Recovered Video Letter';
+                content = 'This letter was recovered from reply data. It appears to be about a video or show.';
+              } else if (firstReply.text.includes('bréf') || firstReply.text.includes('letter')) {
+                title = 'Recovered Text Letter';
+                content = 'This letter was recovered from reply data.';
+              } else {
+                title = 'Recovered Letter';
+                content = 'This letter was recovered from reply data.';
+              }
+              
+              return {
+                id: parseInt(id),
+                title,
+                textContent: content,
+                replies: replies.map((reply: StoredReply) => ({
+                  ...reply,
+                  timestamp: new Date(reply.timestamp)
+                }))
+              };
+            });
+            
+            // Add recovered letters to the list
+            setLetters(prevLetters => [...prevLetters, ...recoveredLetters]);
+          }
+          
+          // Update the default letters with their saved replies
           setLetters(prevLetters => 
             prevLetters.map(letter => ({
               ...letter,
@@ -121,33 +179,93 @@ export default function Home() {
               }))
             }))
           );
+          
+          // Don't auto-save here to avoid overwriting existing data
+          console.log('Loaded replies from old format, not auto-saving to prevent data loss');
+        } else {
+          console.log('No letters found in JSONBin.io, keeping default letters');
         }
+      } else {
+        console.log('JSONBin.io response not ok:', response.status);
       }
     } catch (error) {
-      console.log('Could not load replies:', error);
+      console.log('Could not load letters:', error);
     }
-  }, [JSONBIN_URL, JSONBIN_API_KEY]);
+  }, [JSONBIN_URL, JSONBIN_API_KEY, letters]);
 
-  // Function to save shared replies to JSONBin.io
+  // Function to save shared letters to JSONBin.io with version control
   const saveSharedReplies = useCallback(async (updatedLetters: Letter[]) => {
     try {
-      const repliesToSave: { [key: number]: Reply[] } = {};
-      updatedLetters.forEach(letter => {
-        repliesToSave[letter.id] = letter.replies;
+      // First, get current data to preserve version history
+      const currentResponse = await fetch(JSONBIN_URL, {
+        headers: {
+          'X-Master-Key': JSONBIN_API_KEY,
+        }
       });
-
+      
+      let currentData: StoredData = { letters: [], versions: [], lastUpdated: new Date().toISOString() };
+      
+      if (currentResponse.ok) {
+        const existingData = await currentResponse.json();
+        if (existingData.record) {
+          currentData = existingData.record;
+        }
+      }
+      
+      // IMPORTANT: Only save if we're not overwriting existing data with defaults
+      const hasExistingLetters = currentData.letters && currentData.letters.length > 0;
+      const isOnlyDefaults = updatedLetters.length === 5 && 
+        updatedLetters.every(letter => letter.id <= 5); // Only default letter IDs
+      
+      if (hasExistingLetters && isOnlyDefaults) {
+        console.log('Preventing overwrite of existing data with defaults');
+        return;
+      }
+      
+      // Create new version entry
+      const newVersion: LetterVersion = {
+        timestamp: new Date().toISOString(),
+        letters: updatedLetters.map(letter => ({
+          ...letter,
+          replies: letter.replies.map(reply => ({
+            ...reply,
+            timestamp: reply.timestamp.toISOString()
+          }))
+        }))
+      };
+      
+      // Keep only last 10 versions to prevent bin from getting too large
+      const updatedVersions = [newVersion, ...(currentData.versions || []).slice(0, 9)];
+      
+      // Save with version history
+      const dataToSave: StoredData = {
+        letters: updatedLetters.map(letter => ({
+          ...letter,
+          replies: letter.replies.map(reply => ({
+            ...reply,
+            timestamp: reply.timestamp.toISOString()
+          }))
+        })),
+        versions: updatedVersions,
+        lastUpdated: new Date().toISOString()
+      };
+      
       await fetch(JSONBIN_URL, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'X-Master-Key': JSONBIN_API_KEY,
         },
-        body: JSON.stringify({ replies: repliesToSave })
+        body: JSON.stringify(dataToSave)
       });
+      
+      console.log('Letters saved with version control');
     } catch (error) {
-      console.log('Could not save replies:', error);
+      console.log('Could not save letters:', error);
     }
   }, [JSONBIN_URL, JSONBIN_API_KEY]);
+
+
 
   useEffect(() => {
     // Check if user is already authenticated
@@ -156,10 +274,10 @@ export default function Home() {
       setIsAuthenticated(true);
     }
     
-    // Load shared replies
+    // Load shared letters
     loadSharedReplies();
     
-    // Set up auto-refresh every 5 seconds to sync replies
+    // Set up auto-refresh every 5 seconds to sync letters
     const interval = setInterval(() => {
       if (isAuthenticated) {
         loadSharedReplies();
@@ -230,19 +348,8 @@ export default function Home() {
     const updatedLetters = [newLetter, ...letters];
     setLetters(updatedLetters);
     
-    // Save to shared system - save the entire letters array, not just replies
-    try {
-      await fetch(JSONBIN_URL, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Master-Key': JSONBIN_API_KEY,
-        },
-        body: JSON.stringify({ letters: updatedLetters })
-      });
-    } catch (error) {
-      console.log('Could not save new letter:', error);
-    }
+    // Save to shared system using the version-controlled save function
+    saveSharedReplies(updatedLetters);
     
     // Clear the form and close modal
     setNewLetterTitle("");
@@ -291,19 +398,8 @@ export default function Home() {
     const updatedLetters = [newVideo, ...letters];
     setLetters(updatedLetters);
     
-    // Save to JSONBin.io
-    try {
-      await fetch(JSONBIN_URL, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Master-Key': JSONBIN_API_KEY,
-        },
-        body: JSON.stringify({ letters: updatedLetters })
-      });
-    } catch (error) {
-      console.log('Could not save new video:', error);
-    }
+    // Save to JSONBin.io using the version-controlled save function
+    saveSharedReplies(updatedLetters);
     
     // Clear form and close modal
     setNewVideoTitle("");
