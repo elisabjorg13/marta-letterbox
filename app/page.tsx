@@ -38,6 +38,7 @@ interface StoredLetter {
 interface LetterVersion {
   timestamp: string;
   letters: StoredLetter[];
+  description?: string;
 }
 
 interface StoredData {
@@ -59,6 +60,7 @@ export default function Home() {
   const [newLetterContent, setNewLetterContent] = useState("");
   const [newVideoTitle, setNewVideoTitle] = useState("");
   const [newVideoUrl, setNewVideoUrl] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
   const [letters, setLetters] = useState<Letter[]>([
     {
       id: 5,
@@ -122,6 +124,7 @@ export default function Home() {
               timestamp: new Date(reply.timestamp)
             }))
           })));
+          setIsLoading(false);
         } else if (data.record?.replies) {
           // Handle old format where only replies were stored
           console.log('Loading from old format (replies only)');
@@ -184,14 +187,16 @@ export default function Home() {
           console.log('Loaded replies from old format, not auto-saving to prevent data loss');
         } else {
           console.log('No letters found in JSONBin.io, keeping default letters');
+          setIsLoading(false);
         }
       } else {
         console.log('JSONBin.io response not ok:', response.status);
       }
     } catch (error) {
       console.log('Could not load letters:', error);
+      setIsLoading(false);
     }
-  }, [JSONBIN_URL, JSONBIN_API_KEY, letters]);
+  }, [JSONBIN_URL, JSONBIN_API_KEY]);
 
   // Function to save shared letters to JSONBin.io with version control
   const saveSharedReplies = useCallback(async (updatedLetters: Letter[]) => {
@@ -210,6 +215,19 @@ export default function Home() {
         if (existingData.record) {
           currentData = existingData.record;
         }
+      }
+      
+      // EMERGENCY PROTECTION: Create backup before any save operation
+      if (currentData.letters && currentData.letters.length > 0) {
+        const backupVersion: LetterVersion = {
+          timestamp: new Date().toISOString(),
+          letters: currentData.letters,
+          description: 'EMERGENCY BACKUP - Created before save operation'
+        };
+        
+        // Add backup to versions
+        currentData.versions = [backupVersion, ...(currentData.versions || []).slice(0, 8)];
+        console.log('Created emergency backup before save operation');
       }
       
       // IMPORTANT: Only save if we're not overwriting existing data with defaults
@@ -277,14 +295,7 @@ export default function Home() {
     // Load shared letters
     loadSharedReplies();
     
-    // Set up auto-refresh every 5 seconds to sync letters
-    const interval = setInterval(() => {
-      if (isAuthenticated) {
-        loadSharedReplies();
-      }
-    }, 5000);
-    
-    return () => clearInterval(interval);
+    // Removed dangerous auto-refresh that was causing data deletion
   }, [isAuthenticated, loadSharedReplies]);
 
   const handlePasswordSubmit = (e: React.FormEvent) => {
@@ -836,7 +847,7 @@ export default function Home() {
                   height={200}
                 />
                 <div className="absolute top-10 -right-1 bg-red-500 text-white text-xs rounded-full w-10 h-10 flex items-center justify-center animate-pulse">
-                  {letters.length}
+                  {isLoading ? "..." : letters.length}
                 </div>
               </button>
             </div>
