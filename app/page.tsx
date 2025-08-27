@@ -69,6 +69,30 @@ export default function Home() {
     }
   };
 
+  const exportLetters = () => {
+    try {
+      const backupData = {
+        letters: letters,
+        exportedAt: new Date().toISOString(),
+        totalLetters: letters.length,
+        version: "1.0"
+      };
+      
+      const dataStr = JSON.stringify(backupData, null, 2);
+      const dataBlob = new Blob([dataStr], { type: 'application/json' });
+      
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(dataBlob);
+      link.download = `marta-letterbox-backup-${new Date().toISOString().split('T')[0]}.json`;
+      link.click();
+      
+      alert(`Backup created! Exported ${letters.length} letters.`);
+    } catch (error) {
+      console.error('Error creating backup:', error);
+      alert('Error creating backup: ' + (error as Error).message);
+    }
+  };
+
   if (!isAuthenticated) {
     return (
       <div 
@@ -327,28 +351,25 @@ export default function Home() {
       <div className="max-w-4xl mx-auto">
         <div className="flex justify-between items-center mb-32">
           <button
-            onClick={handleLogout}
-            className="text-red-600 px-2 py-2 rounded-md hover:text-red-700 transition-colors"
+            onClick={exportLetters}
+            className="bg-yellow-600 text-white px-4 py-2 rounded-md hover:bg-yellow-700 transition-colors"
           >
-            Logout
+            💾 Backup Letters
           </button>
-          <button
-            onClick={() => {
-              const subject = "Letterbox Updated";
-              const body = "The letterbox has been updated with new content. Check it out at: https://litladaemid.online";
-              const mailtoLink = `mailto:davidsson.elisa@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-              window.open(mailtoLink);
-            }}
-            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
-          >
-            Notify Subscribers
-          </button>
-          <button
-            onClick={() => setShowAddLetter(true)}
-            className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors"
-          >
-            Bæta við bréfi
-          </button>
+          <div className="flex space-x-4">
+            <button
+              onClick={handleLogout}
+              className="text-red-600 px-2 py-2 rounded-md hover:text-red-700 transition-colors"
+            >
+              Logout
+            </button>
+            <button
+              onClick={() => setShowAddLetter(true)}
+              className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors"
+            >
+              Bæta við bréfi
+            </button>
+          </div>
         </div>
 
         {!showInbox ? (
@@ -372,12 +393,6 @@ export default function Home() {
             <div className="text-center mt-4">
               <p className="text-white text-xl font-semibold drop-shadow-lg">You got mail!</p>
             </div>
-            {/* Debug info */}
-            <div className="text-center mt-2 text-white/70 text-sm">
-              <p>Letters from: {loading ? 'Loading...' : 'Firebase'}</p>
-              <p>Total letters: {letters.length}</p>
-              {error && <p className="text-red-400">Error: {error}</p>}
-            </div>
           </div>
         ) : (
           <div className="rounded-lg shadow-xl p-6">
@@ -399,51 +414,19 @@ export default function Home() {
               {letters.map((letter) => (
                 <div
                   key={letter.id}
+                  onClick={() => setSelectedLetter(letter)}
                   className="p-4 border border-white/30 rounded-lg hover:bg-white/10 cursor-pointer transition-colors bg-white/5"
                 >
-                  <div className="flex justify-between items-start">
-                    <div 
-                      onClick={() => setSelectedLetter(letter)}
-                      className="flex-1 cursor-pointer"
-                    >
-                      <h3 className="text-lg font-medium text-white drop-shadow-lg">
-                        {letter.title}
-                      </h3>
-                      <p className="text-sm text-white/80 drop-shadow-lg">
-                        lesa bréf
-                      </p>
-                      {/* Debug info */}
-                      <p className="text-xs text-white/60 mt-1">
-                        ID: {letter.id} | Type: {letter.imageUrl ? 'Image' : 'Text'}
-                      </p>
-                    </div>
-                    <button
-                      onClick={async (e) => {
-                        e.stopPropagation();
-                        if (confirm(`Delete "${letter.title}"?`)) {
-                          try {
-                            await deleteLetter(letter.id!);
-                            alert('Letter deleted successfully!');
-                          } catch (error) {
-                            alert('Error deleting letter: ' + (error as Error).message);
-                          }
-                        }
-                      }}
-                      className="ml-2 bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-xs transition-colors"
-                    >
-                      Delete
-                    </button>
+                  <div>
+                    <h3 className="text-lg font-medium text-white drop-shadow-lg">
+                      {letter.title}
+                    </h3>
+                    <p className="text-sm text-white/80 drop-shadow-lg">
+                      lesa bréf
+                    </p>
                   </div>
                 </div>
               ))}
-              {/* Debug info */}
-              <div className="text-center p-2 bg-white/10 rounded">
-                <p className="text-xs text-white/70">
-                  Source: {loading ? 'Loading...' : 'Firebase'} | 
-                  Count: {letters.length} | 
-                  {error && <span className="text-red-400">Error: {error}</span>}
-                </p>
-              </div>
             </div>
           </div>
         )}
