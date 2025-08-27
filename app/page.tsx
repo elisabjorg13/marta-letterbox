@@ -1,289 +1,20 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
-
-interface Letter {
-  id: number;
-  title: string;
-  imageUrl?: string;
-  videoUrl?: string;
-  textContent?: string;
-  replies: Reply[];
-}
-
-interface Reply {
-  id: string;
-  text: string;
-  timestamp: Date;
-  author: string;
-}
-
-interface StoredReply {
-  id: string;
-  text: string;
-  timestamp: string;
-  author: string;
-}
-
-interface StoredLetter {
-  id: number;
-  title: string;
-  imageUrl?: string;
-  videoUrl?: string;
-  textContent?: string;
-  replies: StoredReply[];
-}
-
-interface LetterVersion {
-  timestamp: string;
-  letters: StoredLetter[];
-  description?: string;
-}
-
-interface StoredData {
-  letters: StoredLetter[];
-  versions: LetterVersion[];
-  lastUpdated: string;
-}
+import { useLetters, Letter } from "./hooks/useLetters";
 
 export default function Home() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState("");
   const [showInbox, setShowInbox] = useState(false);
   const [selectedLetter, setSelectedLetter] = useState<Letter | null>(null);
-  const [replyText, setReplyText] = useState("");
-  const [replyAuthor, setReplyAuthor] = useState("");
   const [showAddLetter, setShowAddLetter] = useState(false);
-  const [showAddVideo, setShowAddVideo] = useState(false);
   const [newLetterTitle, setNewLetterTitle] = useState("");
   const [newLetterContent, setNewLetterContent] = useState("");
-  const [newVideoTitle, setNewVideoTitle] = useState("");
-  const [newVideoUrl, setNewVideoUrl] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
-  const [letters, setLetters] = useState<Letter[]>([
-    {
-      id: 5,
-      title: "18. ágúst",
-      imageUrl: "/images/bref3.png", // You'll upload this PNG
-      replies: []
-    },
-    {
-      id: 4,
-      title: "Myndband dagsins",
-      videoUrl: "https://www.youtube.com/embed/4YM2kwxFG8Y", // Replace with your actual video URL
-      replies: []
-    },
-    {
-      id: 3,
-      title: "13. ágúst",
-      imageUrl: "/images/today.png", // You'll upload this PNG
-      replies: []
-    },
-    {
-      id: 1,
-      title: "Fyrsta bréf",
-      imageUrl: "/images/rename.png", // You'll upload this PNG
-      replies: []
-    },
-    {
-      id: 2,
-      title: "Skemmtileg mynd",
-      imageUrl: "/images/skor.jpeg", // You'll upload this PNG
-      replies: []
-    },
-
-    // Add more letters as needed
-  ]);
-
-  // JSONBin.io configuration for shared storage
-  const JSONBIN_API_KEY = "$2a$10$HliQVCH.IEWx9XkiRH8hPumYRMjJxOrrPKqikEpBRNICljyEHQyii";
-  const JSONBIN_BIN_ID = "68a470ead0ea881f405d6177";
-  const JSONBIN_URL = `https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}`;
-
-  // Function to load shared letters from JSONBin.io
-  const loadSharedReplies = useCallback(async () => {
-    try {
-      const response = await fetch(JSONBIN_URL, {
-        headers: {
-          'X-Master-Key': JSONBIN_API_KEY,
-        }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log('JSONBin.io data:', data.record);
-        
-        // Load letters from shared storage if available
-        if (data.record?.letters && data.record.letters.length > 0) {
-          console.log('Loading letters from JSONBin.io:', data.record.letters);
-          setLetters(data.record.letters.map((letter: StoredLetter) => ({
-            ...letter,
-            replies: letter.replies.map((reply: StoredReply) => ({
-              ...reply,
-              timestamp: new Date(reply.timestamp)
-            }))
-          })));
-          setIsLoading(false);
-        } else if (data.record?.replies) {
-          // Handle old format where only replies were stored
-          console.log('Loading from old format (replies only)');
-          const savedReplies = data.record.replies;
-          
-          // Find missing letters that have replies but aren't in our default list
-          const existingLetterIds = new Set(letters.map(l => l.id));
-          const missingLetterIds = Object.keys(savedReplies).filter(id => !existingLetterIds.has(parseInt(id)));
-          
-          if (missingLetterIds.length > 0) {
-            console.log('Found missing letters with replies:', missingLetterIds);
-            
-            // Try to recreate missing letters based on reply content
-            const recoveredLetters: Letter[] = missingLetterIds.map(id => {
-              const replies = savedReplies[parseInt(id)];
-              const firstReply = replies[0];
-              
-              // Try to guess the letter type and content from replies
-              let title = `Recovered Letter ${id}`;
-              let content = '';
-              
-              if (firstReply.text.includes('video') || firstReply.text.includes('syningu')) {
-                title = 'Recovered Video Letter';
-                content = 'This letter was recovered from reply data. It appears to be about a video or show.';
-              } else if (firstReply.text.includes('bréf') || firstReply.text.includes('letter')) {
-                title = 'Recovered Text Letter';
-                content = 'This letter was recovered from reply data.';
-              } else {
-                title = 'Recovered Letter';
-                content = 'This letter was recovered from reply data.';
-              }
-              
-              return {
-                id: parseInt(id),
-                title,
-                textContent: content,
-                replies: replies.map((reply: StoredReply) => ({
-                  ...reply,
-                  timestamp: new Date(reply.timestamp)
-                }))
-              };
-            });
-            
-            // Add recovered letters to the list
-            setLetters(prevLetters => [...prevLetters, ...recoveredLetters]);
-          }
-          
-          // Update the default letters with their saved replies
-          setLetters(prevLetters => 
-            prevLetters.map(letter => ({
-              ...letter,
-              replies: (savedReplies[letter.id] || []).map((reply: StoredReply) => ({
-                ...reply,
-                timestamp: new Date(reply.timestamp)
-              }))
-            }))
-          );
-          
-          // Don't auto-save here to avoid overwriting existing data
-          console.log('Loaded replies from old format, not auto-saving to prevent data loss');
-        } else {
-          console.log('No letters found in JSONBin.io, keeping default letters');
-          setIsLoading(false);
-        }
-      } else {
-        console.log('JSONBin.io response not ok:', response.status);
-      }
-    } catch (error) {
-      console.log('Could not load letters:', error);
-      setIsLoading(false);
-    }
-  }, [JSONBIN_URL, JSONBIN_API_KEY]);
-
-  // Function to save shared letters to JSONBin.io with version control
-  const saveSharedReplies = useCallback(async (updatedLetters: Letter[]) => {
-    try {
-      // First, get current data to preserve version history
-      const currentResponse = await fetch(JSONBIN_URL, {
-        headers: {
-          'X-Master-Key': JSONBIN_API_KEY,
-        }
-      });
-      
-      let currentData: StoredData = { letters: [], versions: [], lastUpdated: new Date().toISOString() };
-      
-      if (currentResponse.ok) {
-        const existingData = await currentResponse.json();
-        if (existingData.record) {
-          currentData = existingData.record;
-        }
-      }
-      
-      // EMERGENCY PROTECTION: Create backup before any save operation
-      if (currentData.letters && currentData.letters.length > 0) {
-        const backupVersion: LetterVersion = {
-          timestamp: new Date().toISOString(),
-          letters: currentData.letters,
-          description: 'EMERGENCY BACKUP - Created before save operation'
-        };
-        
-        // Add backup to versions
-        currentData.versions = [backupVersion, ...(currentData.versions || []).slice(0, 8)];
-        console.log('Created emergency backup before save operation');
-      }
-      
-      // IMPORTANT: Only save if we're not overwriting existing data with defaults
-      const hasExistingLetters = currentData.letters && currentData.letters.length > 0;
-      const isOnlyDefaults = updatedLetters.length === 5 && 
-        updatedLetters.every(letter => letter.id <= 5); // Only default letter IDs
-      
-      if (hasExistingLetters && isOnlyDefaults) {
-        console.log('Preventing overwrite of existing data with defaults');
-        return;
-      }
-      
-      // Create new version entry
-      const newVersion: LetterVersion = {
-        timestamp: new Date().toISOString(),
-        letters: updatedLetters.map(letter => ({
-          ...letter,
-          replies: letter.replies.map(reply => ({
-            ...reply,
-            timestamp: reply.timestamp.toISOString()
-          }))
-        }))
-      };
-      
-      // Keep only last 10 versions to prevent bin from getting too large
-      const updatedVersions = [newVersion, ...(currentData.versions || []).slice(0, 9)];
-      
-      // Save with version history
-      const dataToSave: StoredData = {
-        letters: updatedLetters.map(letter => ({
-          ...letter,
-          replies: letter.replies.map(reply => ({
-            ...reply,
-            timestamp: reply.timestamp.toISOString()
-          }))
-        })),
-        versions: updatedVersions,
-        lastUpdated: new Date().toISOString()
-      };
-      
-      await fetch(JSONBIN_URL, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Master-Key': JSONBIN_API_KEY,
-        },
-        body: JSON.stringify(dataToSave)
-      });
-      
-      console.log('Letters saved with version control');
-    } catch (error) {
-      console.log('Could not save letters:', error);
-    }
-  }, [JSONBIN_URL, JSONBIN_API_KEY]);
-
-
+  
+  // Use Firebase letters hook
+  const { letters, loading, error, addLetter, deleteLetter } = useLetters();
 
   useEffect(() => {
     // Check if user is already authenticated
@@ -291,12 +22,7 @@ export default function Home() {
     if (auth === "true") {
       setIsAuthenticated(true);
     }
-    
-    // Load shared letters
-    loadSharedReplies();
-    
-    // Removed dangerous auto-refresh that was causing data deletion
-  }, [isAuthenticated, loadSharedReplies]);
+  }, []);
 
   const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -316,106 +42,31 @@ export default function Home() {
     localStorage.removeItem("marta-auth");
   };
 
-  const handleReply = async () => {
-    if (!selectedLetter || !replyText.trim() || !replyAuthor.trim()) return;
-    
-    const newReply: Reply = {
-      id: Date.now().toString(),
-      text: replyText.trim(),
-      timestamp: new Date(),
-      author: replyAuthor.trim()
-    };
-    
-    // Update the letter with the new reply
-    const updatedLetter = { ...selectedLetter, replies: [...selectedLetter.replies, newReply] };
-    setSelectedLetter(updatedLetter);
-    
-    // Update the letters array
-    setLetters(prevLetters => {
-      const updatedLetters = prevLetters.map(letter => 
-        letter.id === selectedLetter.id ? updatedLetter : letter
-      );
-      // Save to shared system
-      saveSharedReplies(updatedLetters);
-      return updatedLetters;
-    });
-    
-    // Clear the reply form
-    setReplyText("");
-    setReplyAuthor("");
-  };
-
   const handleAddLetter = async () => {
     if (!newLetterTitle.trim() || !newLetterContent.trim()) return;
     
-    const newLetter: Letter = {
-      id: Date.now(),
-      title: newLetterTitle.trim(),
-      textContent: newLetterContent.trim(),
-      replies: []
-    };
-    
-    // Add new letter to the beginning of the array
-    const updatedLetters = [newLetter, ...letters];
-    setLetters(updatedLetters);
-    
-    // Save to shared system using the version-controlled save function
-    saveSharedReplies(updatedLetters);
-    
-    // Clear the form and close modal
-    setNewLetterTitle("");
-    setNewLetterContent("");
-    setShowAddLetter(false);
-  };
-
-  const handleAddVideo = async () => {
-    if (!newVideoTitle.trim() || !newVideoUrl.trim()) return;
-    
-    // Convert regular YouTube URL to embed URL if needed
-    let embedUrl = newVideoUrl.trim();
-    
-    // Handle different YouTube URL formats
-    if (embedUrl.includes('youtube.com/watch')) {
-      const videoId = embedUrl.split('v=')[1]?.split('&')[0];
-      if (videoId) {
-        embedUrl = `https://www.youtube.com/embed/${videoId}`;
-      }
-    } else if (embedUrl.includes('youtu.be/')) {
-      const videoId = embedUrl.split('youtu.be/')[1]?.split('?')[0];
-      if (videoId) {
-        embedUrl = `https://www.youtube.com/embed/${videoId}`;
-      }
-    } else if (embedUrl.includes('youtube.com/embed/')) {
-      // Already in embed format, keep as is
-    } else {
-      alert('Please enter a valid YouTube URL');
-      return;
+    try {
+      console.log('Attempting to add letter to Firebase...');
+      console.log('Letter data:', { title: newLetterTitle.trim(), content: newLetterContent.trim() });
+      
+      const result = await addLetter({
+        title: newLetterTitle.trim(),
+        imageUrl: "", // For now, we'll just store text content
+        textContent: newLetterContent.trim()
+      });
+      
+      console.log('Letter added successfully! Document ID:', result);
+      
+      // Clear form and close modal
+      setNewLetterTitle("");
+      setNewLetterContent("");
+      setShowAddLetter(false);
+      
+      alert("Bréf sent successfully! Check your inbox.");
+    } catch (error) {
+      console.error('Error adding letter to Firebase:', error);
+      alert("Error adding letter: " + (error as Error).message);
     }
-    
-    // Validate the video ID
-    if (!embedUrl.includes('/embed/')) {
-      alert('Could not extract video ID from URL. Please check your YouTube URL.');
-      return;
-    }
-    
-    const newVideo: Letter = {
-      id: Date.now(),
-      title: newVideoTitle.trim(),
-      videoUrl: embedUrl,
-      replies: []
-    };
-    
-    // Add the new video to the beginning of the array
-    const updatedLetters = [newVideo, ...letters];
-    setLetters(updatedLetters);
-    
-    // Save to JSONBin.io using the version-controlled save function
-    saveSharedReplies(updatedLetters);
-    
-    // Clear form and close modal
-    setNewVideoTitle("");
-    setNewVideoUrl("");
-    setShowAddVideo(false);
   };
 
   if (!isAuthenticated) {
@@ -459,162 +110,6 @@ export default function Home() {
     );
   }
 
-  // Add Letter Modal - check this first
-  if (showAddLetter) {
-    return (
-      <div 
-        className="min-h-screen bg-cover bg-center bg-no-repeat p-4"
-        style={{
-          backgroundImage: "url('/images/misterlonely.jpg')",
-          backgroundSize: "cover",
-          backgroundPosition: "center"
-        }}
-      >
-        <div className="max-w-2xl mx-auto">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold text-white font-serif">bréfaskrif </h2>
-            <button
-              onClick={() => setShowAddLetter(false)}
-              className="text-white px-4 py-2 rounded-md hover:text-red-600 transition-colors"
-            >
-              ← Aftur
-            </button>
-          </div>
-          
-          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-6 border border-white/20">
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-white mb-2">
-                  Skrifa bréf
-                </label>
-                <div className="relative">
-                  {/* Single paper background for both title and content */}
-                  <div className="relative bg-white border-2 border-gray-300 shadow-lg overflow-hidden">
-                    {/* Title and content on the same paper */}
-                    <div className="relative z-10 p-6">
-                      {/* Title input */}
-                      <div className="mb-6">
-                        <input
-                          type="text"
-                          value={newLetterTitle}
-                          onChange={(e) => setNewLetterTitle(e.target.value)}
-                          placeholder="Titill bréfs..."
-                          className="w-full px-3 py-2 border-0 bg-transparent placeholder-blue-500/70 focus:outline-none font-serif text-base font-bold"
-                          style={{ fontFamily: 'Georgia, serif', color: '#0000FF' }}
-                        />
-                      </div>
-                      
-                      {/* Content textarea with scrollable overflow */}
-                      <div className="max-h-[32rem] overflow-y-auto">
-                        <textarea
-                          value={newLetterContent}
-                          onChange={(e) => setNewLetterContent(e.target.value)}
-                          placeholder="Skrifaðu bréfið þitt hér..."
-                          rows={20}
-                          className="w-full px-3 py-3 border-0 bg-transparent placeholder-blue-500/70 focus:outline-none resize-none font-serif text-sm leading-tight"
-                          style={{ fontFamily: 'Georgia, serif', color: '#0000FF' }}
-                        />
-                      </div>
-                    </div>
-                    
-                    {/* Red paper lines for the entire paper */}
-                    <div className="absolute inset-0 pointer-events-none">
-                      {[...Array(100)].map((_, i) => (
-                        <div 
-                          key={i}
-                          className="absolute left-0 right-0 h-px bg-red-400 opacity-60"
-                          style={{ top: `${(i + 1) * 20}px` }}
-                        ></div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-        
-              </div>
-              
-              <button
-                onClick={handleAddLetter}
-                disabled={!newLetterTitle.trim() || !newLetterContent.trim()}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors border border-blue-500 shadow-lg"
-              >
-                Senda bréf
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Add Video Modal
-  if (showAddVideo) {
-    return (
-      <div 
-        className="min-h-screen bg-cover bg-center bg-no-repeat p-4"
-        style={{
-          backgroundImage: "url('/images/misterlonely.jpg')",
-          backgroundSize: "cover",
-          backgroundPosition: "center"
-        }}
-      >
-        <div className="max-w-2xl mx-auto">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold text-white font-serif">myndband</h2>
-            <button
-              onClick={() => setShowAddVideo(false)}
-              className="text-white px-4 py-2 rounded-md hover:text-red-600 transition-colors"
-            >
-              ← Aftur
-            </button>
-          </div>
-          
-          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-6 border border-white/20">
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-white mb-2">
-                  Bæta við myndbandi
-                </label>
-                <input
-                  type="text"
-                  value={newVideoTitle}
-                  onChange={(e) => setNewVideoTitle(e.target.value)}
-                  placeholder="Titill myndbands..."
-                  className="w-full px-3 py-2 border border-white/30 rounded-md bg-white/20 text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-white"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-white mb-2">
-                  YouTube URL
-                </label>
-                <input
-                  type="url"
-                  value={newVideoUrl}
-                  onChange={(e) => setNewVideoUrl(e.target.value)}
-                  placeholder="https://www.youtube.com/watch?v=..."
-                  className="w-full px-3 py-2 border border-white/30 rounded-md bg-white/20 text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-white"
-                />
-                <p className="text-xs text-white/70 mt-1">
-                  You can paste a regular YouTube URL, it will be converted to embed format automatically.
-                  <br />
-                  <strong>Supported formats:</strong> youtube.com/watch?v=..., youtu.be/..., or embed URLs
-                </p>
-              </div>
-              
-              <button
-                onClick={handleAddVideo}
-                disabled={!newVideoTitle.trim() || !newVideoUrl.trim()}
-                className="w-full bg-red-600 hover:bg-red-700 text-white py-3 px-4 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors border border-red-500 shadow-lg"
-              >
-                Bæta við myndbandi
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   if (selectedLetter) {
     return (
       <div 
@@ -639,29 +134,8 @@ export default function Home() {
             <h2 className="text-2xl font-bold mb-4 text-gray-800 dark:text-white">
               {selectedLetter.title}
             </h2>
-            <div className="flex justify-center mb-8">
-              {selectedLetter.videoUrl ? (
-                <div className="max-w-full">
-                  <iframe
-                    src={selectedLetter.videoUrl}
-                    title={selectedLetter.title}
-                    width="600"
-                    height="400"
-                    className="rounded-lg shadow-md"
-                    allowFullScreen
-                    frameBorder="0"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    onError={(e) => {
-                      console.error("Video failed to load:", selectedLetter.videoUrl);
-                    }}
-                  />
-                  <div className="mt-2 text-center">
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      If the video doesnt load, try refreshing the page or check your internet connection.
-                    </p>
-                  </div>
-                </div>
-              ) : selectedLetter.imageUrl ? (
+            <div className="flex justify-center">
+              {selectedLetter.imageUrl ? (
                 <Image
                   src={selectedLetter.imageUrl}
                   alt={selectedLetter.title}
@@ -713,7 +187,7 @@ export default function Home() {
                       </div>
                     </div>
                     
-                    {/* Red paper lines - many more to cover the longer paper */}
+                    {/* Red paper lines - French school paper style */}
                     <div className="absolute inset-0 pointer-events-none">
                       {[...Array(100)].map((_, i) => (
                         <div 
@@ -725,57 +199,115 @@ export default function Home() {
                     </div>
                   </div>
                 </div>
-              ) : null}
+              ) : (
+                <p className="text-gray-500">No content available for this letter.</p>
+              )}
             </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-            {/* Replies Section */}
-            <div className="max-w-2xl mx-auto">
-              <h3 className="text-xl font-semibold mb-4 text-gray-800 dark:text-white">
-                Svör ({selectedLetter.replies.length})
-              </h3>
-              
-              {/* Display existing replies */}
-              <div className="space-y-4 mb-6">
-                {selectedLetter.replies.map((reply) => (
-                  <div key={reply.id} className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="font-medium text-white">{reply.author}</span>
-                      <span className="text-sm text-white/70">
-                        {reply.timestamp.toLocaleDateString('is-IS')} {reply.timestamp.toLocaleTimeString('is-IS', {hour: '2-digit', minute:'2-digit'})}
-                      </span>
+  // Add Letter Modal - French School Paper Style
+  if (showAddLetter) {
+    return (
+      <div 
+        className="min-h-screen bg-cover bg-center bg-no-repeat p-4"
+        style={{
+          backgroundImage: "url('/images/misterlonely.jpg')",
+          backgroundSize: "cover",
+          backgroundPosition: "center"
+        }}
+      >
+        <div className="max-w-4xl mx-auto">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-bold text-white font-serif">Écrire une lettre</h2>
+            <button
+              onClick={() => setShowAddLetter(false)}
+              className="text-white px-4 py-2 rounded-md hover:text-red-600 transition-colors"
+            >
+              ← Retour
+            </button>
+          </div>
+          
+          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-6 border border-white/20">
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-white mb-2">
+                  Contenu de la lettre
+                </label>
+                <div className="relative">
+                  {/* French School Paper Background */}
+                  <div className="relative bg-white border-2 border-gray-300 shadow-lg overflow-hidden">
+                    {/* Paper content */}
+                    <div className="relative z-10 p-8">
+                      {/* Title line */}
+                      <div className="mb-4">
+                        <input
+                          type="text"
+                          value={newLetterTitle}
+                          onChange={(e) => setNewLetterTitle(e.target.value)}
+                          placeholder="Titre de la lettre..."
+                          className="w-full px-3 py-2 border-0 bg-transparent placeholder-blue-500/70 focus:outline-none font-serif text-base font-bold"
+                          style={{ fontFamily: 'Georgia, serif', color: '#0000FF' }}
+                        />
+                      </div>
+                      
+                      {/* Date line */}
+                      <div className="text-right mb-4">
+                        <span className="text-xs font-serif italic" style={{ color: '#0000FF' }}>
+                          {new Date().toLocaleDateString('fr-FR', { 
+                            day: 'numeric', 
+                            month: 'long', 
+                            year: 'numeric' 
+                          })}
+                        </span>
+                      </div>
+                      
+                      {/* Letter text with scrollable content */}
+                      <div className="font-serif leading-tight max-h-[32rem] overflow-y-auto">
+                        <textarea
+                          value={newLetterContent}
+                          onChange={(e) => setNewLetterContent(e.target.value)}
+                          placeholder="Écrivez votre lettre ici..."
+                          rows={20}
+                          className="w-full px-3 py-3 border-0 bg-transparent placeholder-blue-500/70 focus:outline-none resize-none font-serif text-sm leading-tight"
+                          style={{ fontFamily: 'Georgia, serif', color: '#0000FF' }}
+                        />
+                      </div>
+                      
+                      {/* Signature line */}
+                      <div className="mt-6 pt-3 border-t border-red-400">
+                        <div className="text-right">
+                          <span className="text-xs font-serif italic" style={{ color: '#0000FF' }}>
+                            Avec amour,
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                    <p className="text-white/90">{reply.text}</p>
+                    
+                    {/* Red paper lines - French school paper style */}
+                    <div className="absolute inset-0 pointer-events-none">
+                      {[...Array(100)].map((_, i) => (
+                        <div 
+                          key={i}
+                          className="absolute left-0 right-0 h-px bg-red-400 opacity-60"
+                          style={{ top: `${(i + 1) * 20}px` }}
+                        ></div>
+                      ))}
+                    </div>
                   </div>
-                ))}
-              </div>
-
-              {/* Reply Form */}
-              <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
-                <h4 className="text-lg font-medium mb-3 text-white">Svara bréfinu</h4>
-                <div className="space-y-3">
-                  <input
-                    type="text"
-                    value={replyAuthor}
-                    onChange={(e) => setReplyAuthor(e.target.value)}
-                    placeholder="Nafn þitt"
-                    className="w-full px-3 py-2 border border-white/30 rounded-md bg-white/20 text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-white"
-                  />
-                  <textarea
-                    value={replyText}
-                    onChange={(e) => setReplyText(e.target.value)}
-                    placeholder="Skrifaðu svar..."
-                    rows={3}
-                    className="w-full px-3 py-2 border border-white/30 rounded-md bg-white/20 text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-white resize-none"
-                  />
-                  <button
-                    onClick={handleReply}
-                    disabled={!replyText.trim() || !replyAuthor.trim()}
-                    className="w-full bg-white/20 text-white py-2 px-4 rounded-md hover:bg-white/30 focus:outline-none focus:ring-2 focus:ring-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors border border-white/30"
-                  >
-                    Senda svar
-                  </button>
                 </div>
               </div>
+              
+              <button
+                onClick={handleAddLetter}
+                disabled={!newLetterTitle.trim() || !newLetterContent.trim()}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors border border-blue-500 shadow-lg"
+              >
+                Envoyer la lettre
+              </button>
             </div>
           </div>
         </div>
@@ -794,47 +326,33 @@ export default function Home() {
     >
       <div className="max-w-4xl mx-auto">
         <div className="flex justify-between items-center mb-32">
-          <div className="flex space-x-4">
-            <button
-              onClick={handleLogout}
-              className="text-red-600 px-2 py-2 rounded-md hover:text-red-700 transition-colors"
-            >
-              Logout
-            </button>
-            <button
-              onClick={loadSharedReplies}
-              className="text-blue-600 px-2 py-2 rounded-md hover:text-blue-700 transition-colors"
-            >
-              🔄 Uppfæra
-            </button>
-          </div>
+          <button
+            onClick={handleLogout}
+            className="text-red-600 px-2 py-2 rounded-md hover:text-red-700 transition-colors"
+          >
+            Logout
+          </button>
+          <button
+            onClick={() => {
+              const subject = "Letterbox Updated";
+              const body = "The letterbox has been updated with new content. Check it out at: https://litladaemid.online";
+              const mailtoLink = `mailto:davidsson.elisa@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+              window.open(mailtoLink);
+            }}
+            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
+          >
+            Notify Subscribers
+          </button>
+          <button
+            onClick={() => setShowAddLetter(true)}
+            className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors"
+          >
+            Bæta við bréfi
+          </button>
         </div>
 
         {!showInbox ? (
           <div>
-            {/* Add Letter and Video Buttons */}
-            <div className="flex justify-center space-x-8 mb-8">
-              <div className="text-center">
-                <button
-                  onClick={() => setShowAddLetter(true)}
-                  className="bg-white/20 hover:bg-white/30 text-white rounded-full w-24 h-24 flex items-center justify-center transition-all transform hover:scale-105 border-2 border-white/30 shadow-lg"
-                >
-                  <span className="text-4xl font-bold">+</span>
-                </button>
-                <p className="text-white text-lg font-semibold drop-shadow-lg mt-2">Skrifa bréf</p>
-              </div>
-              
-              <div className="text-center">
-                <button
-                  onClick={() => setShowAddVideo(true)}
-                  className="bg-red-500/20 hover:bg-red-500/30 text-white rounded-full w-24 h-24 flex items-center justify-center transition-all transform hover:scale-105 border-2 border-red-500/30 shadow-lg"
-                >
-                  <span className="text-4xl font-bold">▶</span>
-                </button>
-                <p className="text-white text-lg font-semibold drop-shadow-lg mt-2">Bæta myndbandi</p>
-              </div>
-            </div>
-
             <div className="flex justify-center">
               <button
                 onClick={() => setShowInbox(true)}
@@ -847,12 +365,18 @@ export default function Home() {
                   height={200}
                 />
                 <div className="absolute top-10 -right-1 bg-red-500 text-white text-xs rounded-full w-10 h-10 flex items-center justify-center animate-pulse">
-                  {isLoading ? "..." : letters.length}
+                  {loading ? "..." : letters.length}
                 </div>
               </button>
             </div>
             <div className="text-center mt-4">
               <p className="text-white text-xl font-semibold drop-shadow-lg">You got mail!</p>
+            </div>
+            {/* Debug info */}
+            <div className="text-center mt-2 text-white/70 text-sm">
+              <p>Letters from: {loading ? 'Loading...' : 'Firebase'}</p>
+              <p>Total letters: {letters.length}</p>
+              {error && <p className="text-red-400">Error: {error}</p>}
             </div>
           </div>
         ) : (
@@ -869,38 +393,57 @@ export default function Home() {
               </button>
             </div>
             
-            {/* Instructions for shared chat */}
-            {/* <div className="bg-blue-500/20 border border-blue-400/30 rounded-lg p-3 mb-4">
-              <p className="text-blue-200 text-sm">
-                💬 <strong>Real Shared Chat:</strong> Both you and Marta can see and reply to letters. 
-                Replies sync automatically every 5 seconds, or click "🔄 Uppfæra" to refresh manually.
-              </p>
-            </div> */}
+
 
             <div className="space-y-3">
               {letters.map((letter) => (
                 <div
                   key={letter.id}
-                  onClick={() => setSelectedLetter(letter)}
                   className="p-4 border border-white/30 rounded-lg hover:bg-white/10 cursor-pointer transition-colors bg-white/5"
                 >
-                  <div className="flex justify-between items-center">
-                    <div>
+                  <div className="flex justify-between items-start">
+                    <div 
+                      onClick={() => setSelectedLetter(letter)}
+                      className="flex-1 cursor-pointer"
+                    >
                       <h3 className="text-lg font-medium text-white drop-shadow-lg">
                         {letter.title}
                       </h3>
                       <p className="text-sm text-white/80 drop-shadow-lg">
-                        opna
+                        lesa bréf
+                      </p>
+                      {/* Debug info */}
+                      <p className="text-xs text-white/60 mt-1">
+                        ID: {letter.id} | Type: {letter.imageUrl ? 'Image' : 'Text'}
                       </p>
                     </div>
-                    {letter.replies.length > 0 && (
-                      <div className="bg-red-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center">
-                        {letter.replies.length}
-                      </div>
-                    )}
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        if (confirm(`Delete "${letter.title}"?`)) {
+                          try {
+                            await deleteLetter(letter.id!);
+                            alert('Letter deleted successfully!');
+                          } catch (error) {
+                            alert('Error deleting letter: ' + (error as Error).message);
+                          }
+                        }
+                      }}
+                      className="ml-2 bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-xs transition-colors"
+                    >
+                      Delete
+                    </button>
                   </div>
                 </div>
               ))}
+              {/* Debug info */}
+              <div className="text-center p-2 bg-white/10 rounded">
+                <p className="text-xs text-white/70">
+                  Source: {loading ? 'Loading...' : 'Firebase'} | 
+                  Count: {letters.length} | 
+                  {error && <span className="text-red-400">Error: {error}</span>}
+                </p>
+              </div>
             </div>
           </div>
         )}
@@ -909,3 +452,4 @@ export default function Home() {
   );
 
 }
+
