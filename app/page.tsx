@@ -9,8 +9,12 @@ import { getSpotifyEmbedUrl } from "./lib/spotify";
 import { formatLetterDate } from "./lib/letterDate";
 
 const ink = { fontFamily: "Georgia, serif", color: "#0000FF" };
-const SITE_PASSWORD = "saxófónn";
+const SITE_PASSWORD = "saxófónn".normalize("NFC");
 const AUTH_STORAGE_KEY = "marta-auth";
+
+function normalizePassword(value: string) {
+  return value.normalize("NFC").trim();
+}
 
 export default function Home() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -27,7 +31,7 @@ export default function Home() {
 
   useEffect(() => {
     const auth = localStorage.getItem(AUTH_STORAGE_KEY);
-    if (auth === SITE_PASSWORD) {
+    if (auth && normalizePassword(auth) === SITE_PASSWORD) {
       setIsAuthenticated(true);
     }
   }, []);
@@ -40,7 +44,7 @@ export default function Home() {
 
   const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (password === SITE_PASSWORD) {
+    if (normalizePassword(password) === SITE_PASSWORD) {
       setIsAuthenticated(true);
       localStorage.setItem(AUTH_STORAGE_KEY, SITE_PASSWORD);
     } else {
@@ -131,6 +135,10 @@ export default function Home() {
                 id="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                autoComplete="off"
+                autoCapitalize="off"
+                autoCorrect="off"
+                spellCheck={false}
                 className="w-full px-3 py-2 border border-white/30 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-white focus:border-white bg-white/10 text-white placeholder-white/70"
                 placeholder="Enter password"
                 required
