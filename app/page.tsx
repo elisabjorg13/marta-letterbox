@@ -9,11 +9,20 @@ import { getSpotifyEmbedUrl } from "./lib/spotify";
 import { formatLetterDate } from "./lib/letterDate";
 
 const ink = { fontFamily: "Georgia, serif", color: "#0000FF" };
-const SITE_PASSWORD = "saxófónn".normalize("NFC");
+const SITE_PASSWORD = "saxófónn";
 const AUTH_STORAGE_KEY = "marta-auth";
 
 function normalizePassword(value: string) {
-  return value.normalize("NFC").trim();
+  return value
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+function passwordsMatch(input: string) {
+  return normalizePassword(input) === normalizePassword(SITE_PASSWORD);
 }
 
 export default function Home() {
@@ -31,7 +40,7 @@ export default function Home() {
 
   useEffect(() => {
     const auth = localStorage.getItem(AUTH_STORAGE_KEY);
-    if (auth && normalizePassword(auth) === SITE_PASSWORD) {
+    if (auth && passwordsMatch(auth)) {
       setIsAuthenticated(true);
     }
   }, []);
@@ -42,9 +51,10 @@ export default function Home() {
     setNewSpotifyUrl("");
   };
 
-  const handlePasswordSubmit = (e: React.FormEvent) => {
+  const handlePasswordSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (normalizePassword(password) === SITE_PASSWORD) {
+    const typed = String(new FormData(e.currentTarget).get("password") ?? password);
+    if (passwordsMatch(typed)) {
       setIsAuthenticated(true);
       localStorage.setItem(AUTH_STORAGE_KEY, SITE_PASSWORD);
     } else {
@@ -133,10 +143,11 @@ export default function Home() {
               <input
                 type="password"
                 id="password"
+                name="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete="off"
-                autoCapitalize="off"
+                autoCapitalize="none"
                 autoCorrect="off"
                 spellCheck={false}
                 className="w-full px-3 py-2 border border-white/30 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-white focus:border-white bg-white/10 text-white placeholder-white/70"
