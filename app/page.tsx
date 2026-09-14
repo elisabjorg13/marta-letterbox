@@ -4,10 +4,8 @@ import { useState, useEffect } from "react";
 import Image from "next/image";
 import { useLetters, Letter } from "./hooks/useLetters";
 import { LetterSheet } from "./components/LetterSheet";
-import { LetterPhoto } from "./components/LetterPhoto";
 import { SpotifyPlayer } from "./components/SpotifyPlayer";
 import { getSpotifyEmbedUrl } from "./lib/spotify";
-import { uploadLetterImage } from "./lib/letterImage";
 import { formatLetterDate } from "./lib/letterDate";
 
 const ink = { fontFamily: "Georgia, serif", color: "#0000FF" };
@@ -20,8 +18,6 @@ export default function Home() {
   const [showAddLetter, setShowAddLetter] = useState(false);
   const [newLetterTitle, setNewLetterTitle] = useState("");
   const [newLetterContent, setNewLetterContent] = useState("");
-  const [newLetterImage, setNewLetterImage] = useState<File | null>(null);
-  const [newLetterImagePreview, setNewLetterImagePreview] = useState("");
   const [newSpotifyUrl, setNewSpotifyUrl] = useState("");
   const [isSending, setIsSending] = useState(false);
 
@@ -34,23 +30,10 @@ export default function Home() {
     }
   }, []);
 
-  useEffect(() => {
-    return () => {
-      if (newLetterImagePreview.startsWith("blob:")) {
-        URL.revokeObjectURL(newLetterImagePreview);
-      }
-    };
-  }, [newLetterImagePreview]);
-
   const resetComposeForm = () => {
     setNewLetterTitle("");
     setNewLetterContent("");
-    setNewLetterImage(null);
     setNewSpotifyUrl("");
-    setNewLetterImagePreview((prev) => {
-      if (prev.startsWith("blob:")) URL.revokeObjectURL(prev);
-      return "";
-    });
   };
 
   const handlePasswordSubmit = (e: React.FormEvent) => {
@@ -71,28 +54,15 @@ export default function Home() {
     localStorage.removeItem("marta-auth");
   };
 
-  const handleImagePick = (file: File | undefined) => {
-    if (!file) return;
-    setNewLetterImagePreview((prev) => {
-      if (prev.startsWith("blob:")) URL.revokeObjectURL(prev);
-      return URL.createObjectURL(file);
-    });
-    setNewLetterImage(file);
-  };
-
   const handleAddLetter = async () => {
     if (!newLetterTitle.trim() || !newLetterContent.trim() || isSending) return;
 
     try {
       setIsSending(true);
-      let imageUrl = "";
-      if (newLetterImage) {
-        imageUrl = await uploadLetterImage(newLetterImage);
-      }
 
       await addLetter({
         title: newLetterTitle.trim(),
-        imageUrl,
+        imageUrl: "",
         textContent: newLetterContent.trim(),
         spotifyUrl: newSpotifyUrl.trim(),
       });
@@ -174,7 +144,6 @@ export default function Home() {
   }
 
   if (selectedLetter) {
-    const letterImage = selectedLetter.imageUrl?.trim() || "";
     const spotifyEmbed = getSpotifyEmbedUrl(selectedLetter.spotifyUrl || "", {
       autoplay: true,
     });
@@ -199,7 +168,7 @@ export default function Home() {
           </div>
 
           <div className="space-y-6">
-            {selectedLetter.textContent || letterImage ? (
+            {selectedLetter.textContent ? (
               <LetterSheet tilt>
                 <div className="mb-4">
                   <h3 className="text-base font-serif font-bold" style={ink}>
@@ -211,16 +180,11 @@ export default function Home() {
                     {formatLetterDate(selectedLetter.createdAt)}
                   </span>
                 </div>
-                {letterImage ? (
-                  <LetterPhoto src={letterImage} alt={selectedLetter.title} />
-                ) : null}
-                {selectedLetter.textContent ? (
-                  <div className="font-serif leading-tight max-h-[32rem] overflow-y-auto">
-                    <p className="text-sm whitespace-pre-wrap" style={ink}>
-                      {selectedLetter.textContent}
-                    </p>
-                  </div>
-                ) : null}
+                <div className="font-serif leading-tight max-h-[32rem] overflow-y-auto">
+                  <p className="text-sm whitespace-pre-wrap" style={ink}>
+                    {selectedLetter.textContent}
+                  </p>
+                </div>
                 <div className="mt-6 pt-3 border-t border-red-400">
                   <div className="text-right">
                     <span className="text-xs font-serif italic" style={{ color: "#0000FF" }}>
@@ -294,38 +258,12 @@ export default function Home() {
                     </span>
                   </div>
 
-                  {newLetterImagePreview ? (
-                    <LetterPhoto
-                      src={newLetterImagePreview}
-                      alt="Photo de la lettre"
-                      onRemove={() => {
-                        setNewLetterImage(null);
-                        setNewLetterImagePreview((prev) => {
-                          if (prev.startsWith("blob:")) URL.revokeObjectURL(prev);
-                          return "";
-                        });
-                      }}
-                    />
-                  ) : (
-                    <label className="my-5 flex flex-col items-center justify-center cursor-pointer border border-dashed border-blue-300 bg-white/40 py-6 text-center">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => handleImagePick(e.target.files?.[0])}
-                      />
-                      <span className="text-sm font-serif" style={ink}>
-                        Ajouter une photo
-                      </span>
-                    </label>
-                  )}
-
                   <div className="font-serif leading-tight max-h-[32rem] overflow-y-auto">
                     <textarea
                       value={newLetterContent}
                       onChange={(e) => setNewLetterContent(e.target.value)}
                       placeholder="Écrivez votre lettre ici..."
-                      rows={16}
+                      rows={20}
                       className="w-full px-3 py-3 border-0 bg-transparent placeholder-blue-500/70 focus:outline-none resize-none font-serif text-sm leading-tight"
                       style={ink}
                     />
