@@ -38,7 +38,7 @@ export default function Home() {
 
   const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (password === "reidhjol1") {
+    if (password === "saxophónn") {
       setIsAuthenticated(true);
       localStorage.setItem("marta-auth", "true");
     } else {
@@ -118,7 +118,10 @@ export default function Home() {
           </h1>
           <form onSubmit={handlePasswordSubmit} className="space-y-4">
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-white mb-2">
+              <label
+                htmlFor="password"
+                className="block text-sm font-medium text-white mb-2"
+              >
                 Enter Password
               </label>
               <input
@@ -176,7 +179,10 @@ export default function Home() {
                   </h3>
                 </div>
                 <div className="text-right mb-4">
-                  <span className="text-xs font-serif italic" style={{ color: "#0000FF" }}>
+                  <span
+                    className="text-xs font-serif italic"
+                    style={{ color: "#0000FF" }}
+                  >
                     {formatLetterDate(selectedLetter.createdAt)}
                   </span>
                 </div>
@@ -187,14 +193,19 @@ export default function Home() {
                 </div>
                 <div className="mt-6 pt-3 border-t border-red-400">
                   <div className="text-right">
-                    <span className="text-xs font-serif italic" style={{ color: "#0000FF" }}>
+                    <span
+                      className="text-xs font-serif italic"
+                      style={{ color: "#0000FF" }}
+                    >
                       Avec amour,
                     </span>
                   </div>
                 </div>
               </LetterSheet>
             ) : (
-              <p className="text-gray-500">No content available for this letter.</p>
+              <p className="text-gray-500">
+                No content available for this letter.
+              </p>
             )}
 
             {spotifyEmbed ? (
@@ -222,7 +233,9 @@ export default function Home() {
       >
         <div className="max-w-4xl mx-auto">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold text-white font-serif">Écrire une lettre</h2>
+            <h2 className="text-2xl font-bold text-white font-serif">
+              Écrire une lettre
+            </h2>
             <button
               onClick={() => {
                 resetComposeForm();
@@ -253,7 +266,10 @@ export default function Home() {
                   </div>
 
                   <div className="text-right mb-4">
-                    <span className="text-xs font-serif italic" style={{ color: "#0000FF" }}>
+                    <span
+                      className="text-xs font-serif italic"
+                      style={{ color: "#0000FF" }}
+                    >
                       {formatLetterDate(new Date())}
                     </span>
                   </div>
@@ -271,7 +287,10 @@ export default function Home() {
 
                   <div className="mt-6 pt-3 border-t border-red-400">
                     <div className="text-right">
-                      <span className="text-xs font-serif italic" style={{ color: "#0000FF" }}>
+                      <span
+                        className="text-xs font-serif italic"
+                        style={{ color: "#0000FF" }}
+                      >
                         Avec amour,
                       </span>
                     </div>
@@ -294,14 +313,19 @@ export default function Home() {
                   <SpotifyPlayer embedUrl={composeSpotifyEmbed} />
                 ) : newSpotifyUrl.trim() ? (
                   <p className="text-sm text-red-200">
-                    Ce lien Spotify n&apos;est pas reconnu. Utilisez un lien de morceau, album ou playlist.
+                    Ce lien Spotify n&apos;est pas reconnu. Utilisez un lien de
+                    morceau, album ou playlist.
                   </p>
                 ) : null}
               </div>
 
               <button
                 onClick={handleAddLetter}
-                disabled={!newLetterTitle.trim() || !newLetterContent.trim() || isSending}
+                disabled={
+                  !newLetterTitle.trim() ||
+                  !newLetterContent.trim() ||
+                  isSending
+                }
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors border border-blue-500 shadow-lg"
               >
                 {isSending ? "Envoi..." : "Envoyer la lettre"}
@@ -365,7 +389,9 @@ export default function Home() {
               </button>
             </div>
             <div className="text-center mt-4">
-              <p className="text-white text-xl font-semibold drop-shadow-lg">You got mail!</p>
+              <p className="text-white text-xl font-semibold drop-shadow-lg">
+                You got mail!
+              </p>
             </div>
           </div>
         ) : (
