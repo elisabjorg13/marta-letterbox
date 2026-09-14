@@ -3,6 +3,14 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import { useLetters, Letter } from "./hooks/useLetters";
+import { LetterSheet } from "./components/LetterSheet";
+import { LetterPhoto } from "./components/LetterPhoto";
+import { SpotifyPlayer } from "./components/SpotifyPlayer";
+import { getSpotifyEmbedUrl } from "./lib/spotify";
+import { uploadLetterImage } from "./lib/letterImage";
+import { formatLetterDate } from "./lib/letterDate";
+
+const ink = { fontFamily: "Georgia, serif", color: "#0000FF" };
 
 export default function Home() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -12,17 +20,38 @@ export default function Home() {
   const [showAddLetter, setShowAddLetter] = useState(false);
   const [newLetterTitle, setNewLetterTitle] = useState("");
   const [newLetterContent, setNewLetterContent] = useState("");
-  
-  // Use Firebase letters hook
-  const { letters, loading, error, addLetter, deleteLetter } = useLetters();
+  const [newLetterImage, setNewLetterImage] = useState<File | null>(null);
+  const [newLetterImagePreview, setNewLetterImagePreview] = useState("");
+  const [newSpotifyUrl, setNewSpotifyUrl] = useState("");
+  const [isSending, setIsSending] = useState(false);
+
+  const { letters, loading, addLetter } = useLetters();
 
   useEffect(() => {
-    // Check if user is already authenticated
     const auth = localStorage.getItem("marta-auth");
     if (auth === "true") {
       setIsAuthenticated(true);
     }
   }, []);
+
+  useEffect(() => {
+    return () => {
+      if (newLetterImagePreview.startsWith("blob:")) {
+        URL.revokeObjectURL(newLetterImagePreview);
+      }
+    };
+  }, [newLetterImagePreview]);
+
+  const resetComposeForm = () => {
+    setNewLetterTitle("");
+    setNewLetterContent("");
+    setNewLetterImage(null);
+    setNewSpotifyUrl("");
+    setNewLetterImagePreview((prev) => {
+      if (prev.startsWith("blob:")) URL.revokeObjectURL(prev);
+      return "";
+    });
+  };
 
   const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,30 +71,40 @@ export default function Home() {
     localStorage.removeItem("marta-auth");
   };
 
+  const handleImagePick = (file: File | undefined) => {
+    if (!file) return;
+    setNewLetterImagePreview((prev) => {
+      if (prev.startsWith("blob:")) URL.revokeObjectURL(prev);
+      return URL.createObjectURL(file);
+    });
+    setNewLetterImage(file);
+  };
+
   const handleAddLetter = async () => {
-    if (!newLetterTitle.trim() || !newLetterContent.trim()) return;
-    
+    if (!newLetterTitle.trim() || !newLetterContent.trim() || isSending) return;
+
     try {
-      console.log('Attempting to add letter to Firebase...');
-      console.log('Letter data:', { title: newLetterTitle.trim(), content: newLetterContent.trim() });
-      
-      const result = await addLetter({
+      setIsSending(true);
+      let imageUrl = "";
+      if (newLetterImage) {
+        imageUrl = await uploadLetterImage(newLetterImage);
+      }
+
+      await addLetter({
         title: newLetterTitle.trim(),
-        imageUrl: "", // For now, we'll just store text content
-        textContent: newLetterContent.trim()
+        imageUrl,
+        textContent: newLetterContent.trim(),
+        spotifyUrl: newSpotifyUrl.trim(),
       });
-      
-      console.log('Letter added successfully! Document ID:', result);
-      
-      // Clear form and close modal
-      setNewLetterTitle("");
-      setNewLetterContent("");
+
+      resetComposeForm();
       setShowAddLetter(false);
-      
       alert("Bréf sent successfully! Check your inbox.");
     } catch (error) {
-      console.error('Error adding letter to Firebase:', error);
+      console.error("Error adding letter to Firebase:", error);
       alert("Error adding letter: " + (error as Error).message);
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -75,32 +114,32 @@ export default function Home() {
         letters: letters,
         exportedAt: new Date().toISOString(),
         totalLetters: letters.length,
-        version: "1.0"
+        version: "1.0",
       };
-      
+
       const dataStr = JSON.stringify(backupData, null, 2);
-      const dataBlob = new Blob([dataStr], { type: 'application/json' });
-      
-      const link = document.createElement('a');
+      const dataBlob = new Blob([dataStr], { type: "application/json" });
+
+      const link = document.createElement("a");
       link.href = URL.createObjectURL(dataBlob);
-      link.download = `marta-letterbox-backup-${new Date().toISOString().split('T')[0]}.json`;
+      link.download = `marta-letterbox-backup-${new Date().toISOString().split("T")[0]}.json`;
       link.click();
-      
+
       alert(`Backup created! Exported ${letters.length} letters.`);
     } catch (error) {
-      console.error('Error creating backup:', error);
-      alert('Error creating backup: ' + (error as Error).message);
+      console.error("Error creating backup:", error);
+      alert("Error creating backup: " + (error as Error).message);
     }
   };
 
   if (!isAuthenticated) {
     return (
-      <div 
+      <div
         className="min-h-screen flex items-center justify-center bg-cover bg-center bg-no-repeat"
         style={{
-          backgroundImage: "url('/images/misterlonely.jpg')", // You'll upload this image
+          backgroundImage: "url('/images/misterlonely.jpg')",
           backgroundSize: "cover",
-          backgroundPosition: "center"
+          backgroundPosition: "center",
         }}
       >
         <div className="p-8 rounded-lg max-w-md w-full mx-4">
@@ -135,13 +174,18 @@ export default function Home() {
   }
 
   if (selectedLetter) {
+    const letterImage = selectedLetter.imageUrl?.trim() || "";
+    const spotifyEmbed = getSpotifyEmbedUrl(selectedLetter.spotifyUrl || "", {
+      autoplay: true,
+    });
+
     return (
-      <div 
+      <div
         className="min-h-screen bg-cover bg-center bg-no-repeat p-4"
         style={{
-          backgroundImage: "url('/images/misterlonely.jpg')", // You'll upload this image
+          backgroundImage: "url('/images/misterlonely.jpg')",
           backgroundSize: "cover",
-          backgroundPosition: "center"
+          backgroundPosition: "center",
         }}
       >
         <div className="max-w-4xl mx-auto">
@@ -153,184 +197,176 @@ export default function Home() {
               ← Aftur í pósthólf
             </button>
           </div>
-          
-          <div className="">
-            <h2 className="text-2xl font-bold mb-4 text-gray-800 dark:text-white">
-              {selectedLetter.title}
-            </h2>
-            <div className="flex justify-center">
-              {selectedLetter.imageUrl ? (
-                <Image
-                  src={selectedLetter.imageUrl}
-                  alt={selectedLetter.title}
-                  width={600}
-                  height={300}
-                  className="max-w-full h-auto rounded-lg shadow-md"
-                  onError={(e) => {
-                    console.error("Image failed to load:", selectedLetter.imageUrl);
-                    e.currentTarget.style.display = "none";
-                  }}
-                />
-              ) : selectedLetter.textContent ? (
-                <div className="max-w-4xl mx-auto">
-                  <div className="relative bg-white border-2 border-gray-300 shadow-lg transform rotate-1 hover:rotate-0 transition-transform duration-300 overflow-hidden">
-                    {/* Letter content */}
-                    <div className="relative z-10 p-8">
-                      {/* Title line */}
-                      <div className="mb-4">
-                        <h3 className="text-base font-serif font-bold" style={{ fontFamily: 'Georgia, serif', color: '#0000FF' }}>
-                          {selectedLetter.title}
-                        </h3>
-                      </div>
-                      
-                      {/* Date line */}
-                      <div className="text-right mb-4">
-                        <span className="text-xs font-serif italic" style={{ color: '#0000FF' }}>
-                          {new Date().toLocaleDateString('fr-FR', { 
-                            day: 'numeric', 
-                            month: 'long', 
-                            year: 'numeric' 
-                          })}
-                        </span>
-                      </div>
-                      
-                      {/* Letter text with scrollable content */}
-                      <div className="font-serif leading-tight max-h-[32rem] overflow-y-auto">
-                        <p className="text-sm whitespace-pre-wrap" style={{ fontFamily: 'Georgia, serif', color: '#0000FF' }}>
-                          {selectedLetter.textContent}
-                        </p>
-                      </div>
-                      
-                      {/* Signature line */}
-                      <div className="mt-6 pt-3 border-t border-red-400">
-                        <div className="text-right">
-                          <span className="text-xs font-serif italic" style={{ color: '#0000FF' }}>
-                            Avec amour,
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* Red paper lines - French school paper style */}
-                    <div className="absolute inset-0 pointer-events-none">
-                      {[...Array(100)].map((_, i) => (
-                        <div 
-                          key={i}
-                          className="absolute left-0 right-0 h-px bg-red-400 opacity-60"
-                          style={{ top: `${(i + 1) * 20}px` }}
-                        ></div>
-                      ))}
-                    </div>
+
+          <div className="space-y-6">
+            {selectedLetter.textContent || letterImage ? (
+              <LetterSheet tilt>
+                <div className="mb-4">
+                  <h3 className="text-base font-serif font-bold" style={ink}>
+                    {selectedLetter.title}
+                  </h3>
+                </div>
+                <div className="text-right mb-4">
+                  <span className="text-xs font-serif italic" style={{ color: "#0000FF" }}>
+                    {formatLetterDate(selectedLetter.createdAt)}
+                  </span>
+                </div>
+                {letterImage ? (
+                  <LetterPhoto src={letterImage} alt={selectedLetter.title} />
+                ) : null}
+                {selectedLetter.textContent ? (
+                  <div className="font-serif leading-tight max-h-[32rem] overflow-y-auto">
+                    <p className="text-sm whitespace-pre-wrap" style={ink}>
+                      {selectedLetter.textContent}
+                    </p>
+                  </div>
+                ) : null}
+                <div className="mt-6 pt-3 border-t border-red-400">
+                  <div className="text-right">
+                    <span className="text-xs font-serif italic" style={{ color: "#0000FF" }}>
+                      Avec amour,
+                    </span>
                   </div>
                 </div>
-              ) : (
-                <p className="text-gray-500">No content available for this letter.</p>
-              )}
-            </div>
+              </LetterSheet>
+            ) : (
+              <p className="text-gray-500">No content available for this letter.</p>
+            )}
+
+            {spotifyEmbed ? (
+              <div className="max-w-lg mx-auto">
+                <SpotifyPlayer embedUrl={spotifyEmbed} autoplay />
+              </div>
+            ) : null}
           </div>
         </div>
       </div>
     );
   }
 
-  // Add Letter Modal - French School Paper Style
   if (showAddLetter) {
+    const composeSpotifyEmbed = getSpotifyEmbedUrl(newSpotifyUrl);
+
     return (
-      <div 
+      <div
         className="min-h-screen bg-cover bg-center bg-no-repeat p-4"
         style={{
           backgroundImage: "url('/images/misterlonely.jpg')",
           backgroundSize: "cover",
-          backgroundPosition: "center"
+          backgroundPosition: "center",
         }}
       >
         <div className="max-w-4xl mx-auto">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-bold text-white font-serif">Écrire une lettre</h2>
             <button
-              onClick={() => setShowAddLetter(false)}
+              onClick={() => {
+                resetComposeForm();
+                setShowAddLetter(false);
+              }}
               className="text-white px-4 py-2 rounded-md hover:text-red-600 transition-colors"
             >
               ← Retour
             </button>
           </div>
-          
+
           <div className="bg-white/10 backdrop-blur-sm rounded-lg p-6 border border-white/20">
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-white mb-2">
                   Contenu de la lettre
                 </label>
-                <div className="relative">
-                  {/* French School Paper Background */}
-                  <div className="relative bg-white border-2 border-gray-300 shadow-lg overflow-hidden">
-                    {/* Paper content */}
-                    <div className="relative z-10 p-8">
-                      {/* Title line */}
-                      <div className="mb-4">
-                        <input
-                          type="text"
-                          value={newLetterTitle}
-                          onChange={(e) => setNewLetterTitle(e.target.value)}
-                          placeholder="Titre de la lettre..."
-                          className="w-full px-3 py-2 border-0 bg-transparent placeholder-blue-500/70 focus:outline-none font-serif text-base font-bold"
-                          style={{ fontFamily: 'Georgia, serif', color: '#0000FF' }}
-                        />
-                      </div>
-                      
-                      {/* Date line */}
-                      <div className="text-right mb-4">
-                        <span className="text-xs font-serif italic" style={{ color: '#0000FF' }}>
-                          {new Date().toLocaleDateString('fr-FR', { 
-                            day: 'numeric', 
-                            month: 'long', 
-                            year: 'numeric' 
-                          })}
-                        </span>
-                      </div>
-                      
-                      {/* Letter text with scrollable content */}
-                      <div className="font-serif leading-tight max-h-[32rem] overflow-y-auto">
-                        <textarea
-                          value={newLetterContent}
-                          onChange={(e) => setNewLetterContent(e.target.value)}
-                          placeholder="Écrivez votre lettre ici..."
-                          rows={20}
-                          className="w-full px-3 py-3 border-0 bg-transparent placeholder-blue-500/70 focus:outline-none resize-none font-serif text-sm leading-tight"
-                          style={{ fontFamily: 'Georgia, serif', color: '#0000FF' }}
-                        />
-                      </div>
-                      
-                      {/* Signature line */}
-                      <div className="mt-6 pt-3 border-t border-red-400">
-                        <div className="text-right">
-                          <span className="text-xs font-serif italic" style={{ color: '#0000FF' }}>
-                            Avec amour,
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* Red paper lines - French school paper style */}
-                    <div className="absolute inset-0 pointer-events-none">
-                      {[...Array(100)].map((_, i) => (
-                        <div 
-                          key={i}
-                          className="absolute left-0 right-0 h-px bg-red-400 opacity-60"
-                          style={{ top: `${(i + 1) * 20}px` }}
-                        ></div>
-                      ))}
+                <LetterSheet>
+                  <div className="mb-4">
+                    <input
+                      type="text"
+                      value={newLetterTitle}
+                      onChange={(e) => setNewLetterTitle(e.target.value)}
+                      placeholder="Titre de la lettre..."
+                      className="w-full px-3 py-2 border-0 bg-transparent placeholder-blue-500/70 focus:outline-none font-serif text-base font-bold"
+                      style={ink}
+                    />
+                  </div>
+
+                  <div className="text-right mb-4">
+                    <span className="text-xs font-serif italic" style={{ color: "#0000FF" }}>
+                      {formatLetterDate(new Date())}
+                    </span>
+                  </div>
+
+                  {newLetterImagePreview ? (
+                    <LetterPhoto
+                      src={newLetterImagePreview}
+                      alt="Photo de la lettre"
+                      onRemove={() => {
+                        setNewLetterImage(null);
+                        setNewLetterImagePreview((prev) => {
+                          if (prev.startsWith("blob:")) URL.revokeObjectURL(prev);
+                          return "";
+                        });
+                      }}
+                    />
+                  ) : (
+                    <label className="my-5 flex flex-col items-center justify-center cursor-pointer border border-dashed border-blue-300 bg-white/40 py-6 text-center">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => handleImagePick(e.target.files?.[0])}
+                      />
+                      <span className="text-sm font-serif" style={ink}>
+                        Ajouter une photo
+                      </span>
+                    </label>
+                  )}
+
+                  <div className="font-serif leading-tight max-h-[32rem] overflow-y-auto">
+                    <textarea
+                      value={newLetterContent}
+                      onChange={(e) => setNewLetterContent(e.target.value)}
+                      placeholder="Écrivez votre lettre ici..."
+                      rows={16}
+                      className="w-full px-3 py-3 border-0 bg-transparent placeholder-blue-500/70 focus:outline-none resize-none font-serif text-sm leading-tight"
+                      style={ink}
+                    />
+                  </div>
+
+                  <div className="mt-6 pt-3 border-t border-red-400">
+                    <div className="text-right">
+                      <span className="text-xs font-serif italic" style={{ color: "#0000FF" }}>
+                        Avec amour,
+                      </span>
                     </div>
                   </div>
-                </div>
+                </LetterSheet>
               </div>
-              
+
+              <div className="space-y-3">
+                <label className="block text-sm font-medium text-white">
+                  Chanson Spotify
+                </label>
+                <input
+                  type="url"
+                  value={newSpotifyUrl}
+                  onChange={(e) => setNewSpotifyUrl(e.target.value)}
+                  placeholder="Collez un lien Spotify ici..."
+                  className="w-full px-3 py-2 rounded-md border border-white/30 bg-white/10 text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-white"
+                />
+                {composeSpotifyEmbed ? (
+                  <SpotifyPlayer embedUrl={composeSpotifyEmbed} />
+                ) : newSpotifyUrl.trim() ? (
+                  <p className="text-sm text-red-200">
+                    Ce lien Spotify n&apos;est pas reconnu. Utilisez un lien de morceau, album ou playlist.
+                  </p>
+                ) : null}
+              </div>
+
               <button
                 onClick={handleAddLetter}
-                disabled={!newLetterTitle.trim() || !newLetterContent.trim()}
+                disabled={!newLetterTitle.trim() || !newLetterContent.trim() || isSending}
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors border border-blue-500 shadow-lg"
               >
-                Envoyer la lettre
+                {isSending ? "Envoi..." : "Envoyer la lettre"}
               </button>
             </div>
           </div>
@@ -340,12 +376,12 @@ export default function Home() {
   }
 
   return (
-    <div 
+    <div
       className="min-h-screen bg-cover bg-center bg-no-repeat p-4"
       style={{
-        backgroundImage: "url('/images/postbox.png')", // You'll upload this image
+        backgroundImage: "url('/images/postbox.png')",
         backgroundSize: "cover",
-        backgroundPosition: "center"
+        backgroundPosition: "center",
       }}
     >
       <div className="max-w-4xl mx-auto">
@@ -380,7 +416,7 @@ export default function Home() {
                 className="relative text-white rounded-full shadow-lg transition-all transform hover:scale-105"
               >
                 <Image
-                  src="/images/pngegg.png" // You'll upload this image
+                  src="/images/pngegg.png"
                   alt="Mail"
                   width={200}
                   height={200}
@@ -407,8 +443,6 @@ export default function Home() {
                 ← Back
               </button>
             </div>
-            
-
 
             <div className="space-y-3">
               {letters.map((letter) => (
@@ -433,6 +467,4 @@ export default function Home() {
       </div>
     </div>
   );
-
 }
-

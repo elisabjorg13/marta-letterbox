@@ -16,6 +16,7 @@ export interface Letter {
   title: string;
   imageUrl: string;
   textContent?: string;
+  spotifyUrl?: string;
   createdAt?: Date;
 }
 
