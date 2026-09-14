@@ -9,6 +9,8 @@ import { getSpotifyEmbedUrl } from "./lib/spotify";
 import { formatLetterDate } from "./lib/letterDate";
 
 const ink = { fontFamily: "Georgia, serif", color: "#0000FF" };
+const SITE_PASSWORD = "saxófónn";
+const AUTH_STORAGE_KEY = "marta-auth";
 
 export default function Home() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -24,8 +26,8 @@ export default function Home() {
   const { letters, loading, addLetter } = useLetters();
 
   useEffect(() => {
-    const auth = localStorage.getItem("marta-auth");
-    if (auth === "true") {
+    const auth = localStorage.getItem(AUTH_STORAGE_KEY);
+    if (auth === SITE_PASSWORD) {
       setIsAuthenticated(true);
     }
   }, []);
@@ -38,9 +40,9 @@ export default function Home() {
 
   const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (password === "saxophónn") {
+    if (password === SITE_PASSWORD) {
       setIsAuthenticated(true);
-      localStorage.setItem("marta-auth", "true");
+      localStorage.setItem(AUTH_STORAGE_KEY, SITE_PASSWORD);
     } else {
       alert("Wrong password!");
       setPassword("");
@@ -51,7 +53,7 @@ export default function Home() {
     setIsAuthenticated(false);
     setShowInbox(false);
     setSelectedLetter(null);
-    localStorage.removeItem("marta-auth");
+    localStorage.removeItem(AUTH_STORAGE_KEY);
   };
 
   const handleAddLetter = async () => {
